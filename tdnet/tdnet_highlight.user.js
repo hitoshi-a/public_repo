@@ -50,7 +50,7 @@
     },
 ng: {
   rowBackground: "#d1d5db",
-  rowOpacity: "0.10",
+  rowOpacity: "0.15",
   badgeBackground: "#9ca3af",
   badgeColor: "#111827",
   label: "NG"
