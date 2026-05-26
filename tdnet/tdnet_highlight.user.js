@@ -184,16 +184,25 @@
     return String(code).trim().toUpperCase();
   }
 
-  function extractCode(text) {
-    if (!text) return null;
+  function extractCodeFromRow(row) {
+    const cells = Array.from(row.querySelectorAll("td"));
 
-    // 日本株コード想定:
-    // 4桁数字、または 3桁数字 + 英数字
-    // 例: 6857, 130A
-    const match = text.match(/\b[0-9]{3}[0-9A-Z]\b/);
-    return match ? normalizeCode(match[0]) : null;
+    // TDnetの通常表: 時刻 / コード / 会社名 / 表題 ...
+    if (cells.length < 3) return null;
+
+    const raw = (cells[1].textContent || "").trim().toUpperCase();
+
+    // TDnetでは 68570 のように5桁表示されることがある。
+    // 末尾0を除いた先頭4文字を通常の証券コードとして扱う。
+    const m5 = raw.match(/^([0-9]{3}[0-9A-Z])0$/);
+    if (m5) return m5[1];
+
+    // 念のため、4文字コードにも対応する。
+    const m4 = raw.match(/^([0-9]{3}[0-9A-Z])$/);
+    if (m4) return m4[1];
+
+    return null;
   }
-
   function containsAny(text, keywords) {
     return keywords.some((kw) => text.includes(kw));
   }
@@ -306,7 +315,7 @@
       if (row.getAttribute(CONFIG.processedAttr) === "1") continue;
 
       const rowText = row.textContent || "";
-      const code = extractCode(rowText);
+      const code = extractCodeFromRow(row);
 
       if (!code) continue;
 
