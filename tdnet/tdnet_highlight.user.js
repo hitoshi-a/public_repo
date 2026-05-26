@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.2
+// @version      0.1.3
 // @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
@@ -48,13 +48,13 @@
       badgeColor: "#78350f",
       label: "注意"
     },
-ng: {
-  rowBackground: "#d1d5db",
-  rowOpacity: "0.15",
-  badgeBackground: "#9ca3af",
-  badgeColor: "#111827",
-  label: "NG"
-},
+    ng: {
+      rowBackground: "#d1d5db",
+      rowOpacity: "0.15",
+      badgeBackground: "#9ca3af",
+      badgeColor: "#111827",
+      label: "NG"
+    },
     unknown: {
       rowBackground: "#ffe4e6",
       rowOpacity: "",
@@ -63,9 +63,9 @@ ng: {
       label: "要確認"
     },
     missing: {
-      rowBackground: "#ffe4e6",
-      rowOpacity: "",
-      badgeBackground: "#fecdd3",
+      rowBackground: "#d1d5db",
+      rowOpacity: "0.15",
+      badgeBackground: "#9ca3af",
       badgeColor: "#881337",
       label: "未登録"
     }
