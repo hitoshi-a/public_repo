@@ -48,13 +48,13 @@
       badgeColor: "#78350f",
       label: "注意"
     },
-    ng: {
-      rowBackground: "#e5e7eb",
-      rowOpacity: "0.45",
-      badgeBackground: "#d1d5db",
-      badgeColor: "#374151",
-      label: "NG"
-    },
+ng: {
+  rowBackground: "#d1d5db",
+  rowOpacity: "0.38",
+  badgeBackground: "#9ca3af",
+  badgeColor: "#111827",
+  label: "NG"
+},
     unknown: {
       rowBackground: "#ffe4e6",
       rowOpacity: "",
