@@ -67,7 +67,7 @@
       rowOpacity: "0.15",
       badgeBackground: "#9ca3af",
       badgeColor: "#881337",
-      label: "未登録"
+      label: "東証外"
     }
   };
 
