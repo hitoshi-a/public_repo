@@ -158,14 +158,23 @@
     return span;
   }
 
-  function ensureExtraCell(row) {
-    const existing = row.querySelector(`.${CONFIG.cellClass}`);
-    if (existing) return existing;
+  function ensureBadgeContainer(row) {
+    const cells = Array.from(row.querySelectorAll("td"));
 
-    const td = document.createElement("td");
-    td.className = CONFIG.cellClass;
-    row.appendChild(td);
-    return td;
+    // TDnet縺ｮ騾壼ｸｸ陦ｨ: 譎ょ綾 / 繧ｳ繝ｼ繝・/ 莨夂､ｾ蜷・/ 陦ｨ鬘・...
+    const targetCell = cells[2] || cells[3] || null;
+    if (!targetCell) return null;
+
+    let container = targetCell.querySelector(`.${CONFIG.cellClass}`);
+    if (container) return container;
+
+    container = document.createElement("span");
+    container.className = CONFIG.cellClass;
+    container.style.marginLeft = "6px";
+    container.style.whiteSpace = "nowrap";
+
+    targetCell.appendChild(container);
+    return container;
   }
 
   function findCandidateRows() {
@@ -179,15 +188,10 @@
     });
   }
 
-  function normalizeCode(code) {
-    if (!code) return "";
-    return String(code).trim().toUpperCase();
-  }
-
   function extractCodeFromRow(row) {
     const cells = Array.from(row.querySelectorAll("td"));
 
-    // TDnetの通常表: 時刻 / コード / 会社名 / 表題 ...
+// TDnetの通常表: 時刻 / コード / 会社名 / 表題 ...
     if (cells.length < 3) return null;
 
     const raw = (cells[1].textContent || "").trim().toUpperCase();
@@ -286,7 +290,9 @@
   }
 
   function addBadges(row, info, status) {
-    const cell = ensureExtraCell(row);
+    const cell = ensureBadgeContainer(row);
+    if (!cell) return;
+
     const style = STATUS_STYLE[status] || STATUS_STYLE.unknown;
 
     // 状態バッジ
