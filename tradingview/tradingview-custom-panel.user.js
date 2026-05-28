@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.0
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7 heading navigation version.
+// @version      0.7.1
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.1 heading navigation for custom section marks.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -51,7 +51,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7",
+    panelTitle: "TV Custom Panel v0.7.1",
     titlePollIntervalMs: 1000,
   };
 
@@ -1072,6 +1072,7 @@
 
     currentHeadings = [];
 
+    let headingIdCounter = 0;
     let i = 0;
     let inCodeBlock = false;
     let codeLines = [];
@@ -1096,6 +1097,22 @@
     function flushCodeBlock() {
       html.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
       codeLines = [];
+    }
+
+    function createHeading(level, text, addToToc) {
+      const headingText = String(text || "").trim();
+      const headingId = `tv-md-heading-${headingIdCounter}`;
+      headingIdCounter += 1;
+
+      if (addToToc) {
+        currentHeadings.push({
+          id: headingId,
+          level: level,
+          text: headingText,
+        });
+      }
+
+      html.push(`<h${level} id="${headingId}">${formatInline(headingText)}</h${level}>`);
     }
 
     while (i < lines.length) {
@@ -1153,18 +1170,27 @@
         flushList();
 
         const level = headingMatch[1].length;
-        const headingText = headingMatch[2].trim();
-        const headingId = `tv-md-heading-${currentHeadings.length}`;
+        createHeading(level, headingMatch[2], level === 2 || level === 3);
+        i += 1;
+        continue;
+      }
 
-        if (level === 2 || level === 3) {
-          currentHeadings.push({
-            id: headingId,
-            level: level,
-            text: headingText,
-          });
-        }
+      const blockHeadingMatch = /^■\s*(.+)$/.exec(line);
+      if (blockHeadingMatch) {
+        flushParagraph();
+        flushList();
 
-        html.push(`<h${level} id="${headingId}">${formatInline(headingText)}</h${level}>`);
+        createHeading(2, blockHeadingMatch[1], true);
+        i += 1;
+        continue;
+      }
+
+      const subBlockHeadingMatch = /^□\s*(.+)$/.exec(line);
+      if (subBlockHeadingMatch) {
+        flushParagraph();
+        flushList();
+
+        createHeading(3, subBlockHeadingMatch[1], true);
         i += 1;
         continue;
       }
