@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.4.0
-// @description  Show a local markdown file in a left-side panel on TradingView. v0.4 resizable panel version.
+// @version      0.5.0
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.5 free move and resize version.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -24,19 +24,28 @@
     headerId: "tv-md-panel-header",
     bodyId: "tv-md-panel-body",
     refreshButtonId: "tv-md-refresh",
+    settingsButtonId: "tv-md-settings",
     closeButtonId: "tv-md-close",
     floatingButtonId: "tv-md-floating-button",
     titleId: "tv-md-title",
-    resizerId: "tv-md-panel-resizer",
+    settingsMenuId: "tv-md-settings-menu",
+    resetLayoutButtonId: "tv-md-reset-layout",
+
+    rightResizerId: "tv-md-resizer-right",
+    bottomResizerId: "tv-md-resizer-bottom",
+    cornerResizerId: "tv-md-resizer-corner",
 
     userHiddenStorageKey: "tvCustomPanelUserHidden",
-    panelWidthStorageKey: "tvCustomPanelWidth",
+    panelRectStorageKey: "tvCustomPanelRect",
 
+    defaultPanelLeft: 0,
+    defaultPanelTop: 56,
     defaultPanelWidth: 480,
     minPanelWidth: 320,
-    maxPanelWidth: 900,
+    maxPanelWidth: 1200,
+    minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.4",
+    panelTitle: "TV Custom Panel v0.5",
     titlePollIntervalMs: 1000,
   };
 
@@ -44,7 +53,8 @@
   let currentTarget = null;
   let titleWatcherId = null;
   let userHidden = false;
-  let resizerInitialized = false;
+  let moveInitialized = false;
+  let resizeInitialized = false;
 
   function init() {
     if (!document.body) {
@@ -56,8 +66,9 @@
     createPanel();
     createFloatingButton();
 
-    applyPanelWidth(loadPanelWidth());
-    setupPanelResizer();
+    applyPanelRect(loadPanelRect());
+    setupPanelMove();
+    setupPanelResize();
 
     userHidden = loadUserHidden();
 
@@ -81,16 +92,16 @@
     style.textContent = `
       #${CONFIG.panelId} {
         position: fixed;
-        top: 56px;
-        left: 0;
-        bottom: 24px;
+        top: ${CONFIG.defaultPanelTop}px;
+        left: ${CONFIG.defaultPanelLeft}px;
         width: ${CONFIG.defaultPanelWidth}px;
+        height: 720px;
         min-width: ${CONFIG.minPanelWidth}px;
-        max-width: ${CONFIG.maxPanelWidth}px;
+        min-height: ${CONFIG.minPanelHeight}px;
         z-index: 999999;
         background: rgba(20, 20, 24, 0.97);
         color: #ddd;
-        border-right: 1px solid #555;
+        border: 1px solid #555;
         box-sizing: border-box;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         box-shadow: 2px 0 8px rgba(0, 0, 0, 0.35);
@@ -112,6 +123,7 @@
       }
 
       #${CONFIG.refreshButtonId},
+      #${CONFIG.settingsButtonId},
       #${CONFIG.closeButtonId} {
         width: 28px;
         height: 24px;
@@ -126,6 +138,7 @@
       }
 
       #${CONFIG.refreshButtonId}:hover,
+      #${CONFIG.settingsButtonId}:hover,
       #${CONFIG.closeButtonId}:hover {
         background: #3a3a42;
       }
@@ -136,6 +149,13 @@
         text-overflow: ellipsis;
         flex: 1;
         font-weight: 600;
+        cursor: move;
+        padding: 3px 4px;
+        border-radius: 3px;
+      }
+
+      #${CONFIG.titleId}:hover {
+        background: rgba(255, 255, 255, 0.06);
       }
 
       #${CONFIG.bodyId} {
@@ -201,19 +221,77 @@
         background: rgba(58, 58, 66, 0.98);
       }
 
-      #${CONFIG.resizerId} {
+      #${CONFIG.rightResizerId} {
         position: absolute;
         top: 0;
         right: 0;
-        width: 6px;
+        width: 7px;
         height: 100%;
         cursor: ew-resize;
         background: transparent;
-        z-index: 1;
+        z-index: 2;
       }
 
-      #${CONFIG.resizerId}:hover {
-        background: rgba(255, 255, 255, 0.12);
+      #${CONFIG.bottomResizerId} {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: 7px;
+        cursor: ns-resize;
+        background: transparent;
+        z-index: 2;
+      }
+
+      #${CONFIG.cornerResizerId} {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 14px;
+        height: 14px;
+        cursor: nwse-resize;
+        background: rgba(255, 255, 255, 0.08);
+        z-index: 3;
+      }
+
+      #${CONFIG.rightResizerId}:hover,
+      #${CONFIG.bottomResizerId}:hover,
+      #${CONFIG.cornerResizerId}:hover {
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      #${CONFIG.settingsMenuId} {
+        position: absolute;
+        top: 38px;
+        right: 10px;
+        z-index: 4;
+        min-width: 180px;
+        padding: 8px;
+        box-sizing: border-box;
+        border: 1px solid #555;
+        border-radius: 6px;
+        background: rgba(28, 28, 32, 0.98);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+        display: none;
+      }
+
+      #${CONFIG.settingsMenuId}.is-open {
+        display: block;
+      }
+
+      #${CONFIG.resetLayoutButtonId} {
+        width: 100%;
+        height: 28px;
+        border: 1px solid #666;
+        border-radius: 4px;
+        background: #2b2b31;
+        color: #ddd;
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      #${CONFIG.resetLayoutButtonId}:hover {
+        background: #3a3a42;
       }
     `;
 
@@ -242,9 +320,20 @@
       });
     });
 
+    const settingsButton = document.createElement("button");
+    settingsButton.id = CONFIG.settingsButtonId;
+    settingsButton.type = "button";
+    settingsButton.title = "Panel settings";
+    settingsButton.textContent = "⚙";
+    settingsButton.addEventListener("click", function (event) {
+      toggleSettingsMenu();
+      event.stopPropagation();
+    });
+
     const title = document.createElement("span");
     title.id = CONFIG.titleId;
     title.textContent = CONFIG.panelTitle;
+    title.title = "Drag here to move panel";
 
     const closeButton = document.createElement("button");
     closeButton.id = CONFIG.closeButtonId;
@@ -259,18 +348,53 @@
     const body = document.createElement("div");
     body.id = CONFIG.bodyId;
 
-    const resizer = document.createElement("div");
-    resizer.id = CONFIG.resizerId;
+    const rightResizer = document.createElement("div");
+    rightResizer.id = CONFIG.rightResizerId;
+
+    const bottomResizer = document.createElement("div");
+    bottomResizer.id = CONFIG.bottomResizerId;
+
+    const cornerResizer = document.createElement("div");
+    cornerResizer.id = CONFIG.cornerResizerId;
+
+    const settingsMenu = document.createElement("div");
+    settingsMenu.id = CONFIG.settingsMenuId;
+
+    const resetButton = document.createElement("button");
+    resetButton.id = CONFIG.resetLayoutButtonId;
+    resetButton.type = "button";
+    resetButton.textContent = "位置とサイズをリセット";
+    resetButton.addEventListener("click", function () {
+      const rect = getDefaultPanelRect();
+      applyPanelRect(rect);
+      savePanelRect(rect);
+      closeSettingsMenu();
+    });
+
+    settingsMenu.appendChild(resetButton);
 
     header.appendChild(refreshButton);
+    header.appendChild(settingsButton);
     header.appendChild(title);
     header.appendChild(closeButton);
 
     panel.appendChild(header);
     panel.appendChild(body);
-    panel.appendChild(resizer);
+    panel.appendChild(rightResizer);
+    panel.appendChild(bottomResizer);
+    panel.appendChild(cornerResizer);
+    panel.appendChild(settingsMenu);
 
     document.body.appendChild(panel);
+
+    window.addEventListener("click", function (event) {
+      const menu = document.getElementById(CONFIG.settingsMenuId);
+      const button = document.getElementById(CONFIG.settingsButtonId);
+      if (!menu || !button) return;
+
+      if (menu.contains(event.target) || button.contains(event.target)) return;
+      closeSettingsMenu();
+    });
   }
 
   function createFloatingButton() {
@@ -735,23 +859,26 @@
     button.style.display = panelVisible ? "none" : "block";
   }
 
-  function setupPanelResizer() {
-    if (resizerInitialized) return;
+  function setupPanelMove() {
+    if (moveInitialized) return;
 
     const panel = document.getElementById(CONFIG.panelId);
-    const resizer = document.getElementById(CONFIG.resizerId);
-    if (!panel || !resizer) return;
+    const handle = document.getElementById(CONFIG.titleId);
+    if (!panel || !handle) return;
 
     let isDragging = false;
     let startX = 0;
-    let startWidth = 0;
+    let startY = 0;
+    let startRect = null;
 
-    resizer.addEventListener("mousedown", function (event) {
+    handle.addEventListener("mousedown", function (event) {
+      const rect = getPanelRect();
       isDragging = true;
       startX = event.clientX;
-      startWidth = panel.getBoundingClientRect().width;
+      startY = event.clientY;
+      startRect = rect;
 
-      document.body.style.cursor = "ew-resize";
+      document.body.style.cursor = "move";
       document.body.style.userSelect = "none";
 
       event.preventDefault();
@@ -759,16 +886,19 @@
     });
 
     window.addEventListener("mousemove", function (event) {
-      if (!isDragging) return;
+      if (!isDragging || !startRect) return;
 
-      const delta = event.clientX - startX;
-      const newWidth = clamp(
-        startWidth + delta,
-        CONFIG.minPanelWidth,
-        CONFIG.maxPanelWidth
-      );
+      const deltaX = event.clientX - startX;
+      const deltaY = event.clientY - startY;
 
-      panel.style.width = `${newWidth}px`;
+      const nextRect = normalizePanelRect({
+        left: startRect.left + deltaX,
+        top: startRect.top + deltaY,
+        width: startRect.width,
+        height: startRect.height,
+      });
+
+      applyPanelRect(nextRect);
     });
 
     window.addEventListener("mouseup", function () {
@@ -778,44 +908,212 @@
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
 
-      const finalWidth = Math.round(panel.getBoundingClientRect().width);
-      savePanelWidth(finalWidth);
+      savePanelRect(getPanelRect());
     });
 
-    resizerInitialized = true;
+    moveInitialized = true;
   }
 
-  function applyPanelWidth(width) {
+  function setupPanelResize() {
+    if (resizeInitialized) return;
+
+    const panel = document.getElementById(CONFIG.panelId);
+    const rightResizer = document.getElementById(CONFIG.rightResizerId);
+    const bottomResizer = document.getElementById(CONFIG.bottomResizerId);
+    const cornerResizer = document.getElementById(CONFIG.cornerResizerId);
+
+    if (!panel || !rightResizer || !bottomResizer || !cornerResizer) return;
+
+    let resizeMode = null;
+    let startX = 0;
+    let startY = 0;
+    let startRect = null;
+
+    function startResize(mode, event) {
+      resizeMode = mode;
+      startX = event.clientX;
+      startY = event.clientY;
+      startRect = getPanelRect();
+
+      if (mode === "right") {
+        document.body.style.cursor = "ew-resize";
+      } else if (mode === "bottom") {
+        document.body.style.cursor = "ns-resize";
+      } else {
+        document.body.style.cursor = "nwse-resize";
+      }
+
+      document.body.style.userSelect = "none";
+
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    rightResizer.addEventListener("mousedown", function (event) {
+      startResize("right", event);
+    });
+
+    bottomResizer.addEventListener("mousedown", function (event) {
+      startResize("bottom", event);
+    });
+
+    cornerResizer.addEventListener("mousedown", function (event) {
+      startResize("corner", event);
+    });
+
+    window.addEventListener("mousemove", function (event) {
+      if (!resizeMode || !startRect) return;
+
+      const deltaX = event.clientX - startX;
+      const deltaY = event.clientY - startY;
+
+      const nextRect = {
+        left: startRect.left,
+        top: startRect.top,
+        width: startRect.width,
+        height: startRect.height,
+      };
+
+      if (resizeMode === "right" || resizeMode === "corner") {
+        nextRect.width = startRect.width + deltaX;
+      }
+
+      if (resizeMode === "bottom" || resizeMode === "corner") {
+        nextRect.height = startRect.height + deltaY;
+      }
+
+      applyPanelRect(normalizePanelRect(nextRect));
+    });
+
+    window.addEventListener("mouseup", function () {
+      if (!resizeMode) return;
+
+      resizeMode = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+
+      savePanelRect(getPanelRect());
+    });
+
+    resizeInitialized = true;
+  }
+
+  function getPanelRect() {
+    const panel = document.getElementById(CONFIG.panelId);
+
+    if (!panel) {
+      return getDefaultPanelRect();
+    }
+
+    const rect = panel.getBoundingClientRect();
+
+    return normalizePanelRect({
+      left: Math.round(rect.left),
+      top: Math.round(rect.top),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    });
+  }
+
+  function getDefaultPanelRect() {
+    const availableHeight = Math.max(
+      CONFIG.minPanelHeight,
+      window.innerHeight - CONFIG.defaultPanelTop - 24
+    );
+
+    return normalizePanelRect({
+      left: CONFIG.defaultPanelLeft,
+      top: CONFIG.defaultPanelTop,
+      width: CONFIG.defaultPanelWidth,
+      height: availableHeight,
+    });
+  }
+
+  function applyPanelRect(rect) {
     const panel = document.getElementById(CONFIG.panelId);
     if (!panel) return;
 
-    const clamped = clamp(width, CONFIG.minPanelWidth, CONFIG.maxPanelWidth);
-    panel.style.width = `${clamped}px`;
+    const normalized = normalizePanelRect(rect);
+
+    panel.style.left = `${normalized.left}px`;
+    panel.style.top = `${normalized.top}px`;
+    panel.style.width = `${normalized.width}px`;
+    panel.style.height = `${normalized.height}px`;
   }
 
-  function loadPanelWidth() {
+  function loadPanelRect() {
     try {
-      const raw = localStorage.getItem(CONFIG.panelWidthStorageKey);
-      const width = Number(raw);
+      const raw = localStorage.getItem(CONFIG.panelRectStorageKey);
+      if (!raw) return getDefaultPanelRect();
 
-      if (!Number.isFinite(width)) {
-        return CONFIG.defaultPanelWidth;
-      }
-
-      return clamp(width, CONFIG.minPanelWidth, CONFIG.maxPanelWidth);
+      const parsed = JSON.parse(raw);
+      return normalizePanelRect({
+        left: Number(parsed.left),
+        top: Number(parsed.top),
+        width: Number(parsed.width),
+        height: Number(parsed.height),
+      });
     } catch (error) {
-      console.warn("[TV Custom Panel] Failed to load panel width:", error);
-      return CONFIG.defaultPanelWidth;
+      console.warn("[TV Custom Panel] Failed to load panel rect:", error);
+      return getDefaultPanelRect();
     }
   }
 
-  function savePanelWidth(width) {
+  function savePanelRect(rect) {
     try {
-      const clamped = clamp(width, CONFIG.minPanelWidth, CONFIG.maxPanelWidth);
-      localStorage.setItem(CONFIG.panelWidthStorageKey, String(clamped));
+      const normalized = normalizePanelRect(rect);
+      localStorage.setItem(
+        CONFIG.panelRectStorageKey,
+        JSON.stringify(normalized)
+      );
     } catch (error) {
-      console.warn("[TV Custom Panel] Failed to save panel width:", error);
+      console.warn("[TV Custom Panel] Failed to save panel rect:", error);
     }
+  }
+
+  function normalizePanelRect(rect) {
+    const viewportWidth = Math.max(window.innerWidth || 0, CONFIG.minPanelWidth);
+    const viewportHeight = Math.max(window.innerHeight || 0, CONFIG.minPanelHeight);
+
+    let width = Number(rect && rect.width);
+    let height = Number(rect && rect.height);
+    let left = Number(rect && rect.left);
+    let top = Number(rect && rect.top);
+
+    if (!Number.isFinite(width)) width = CONFIG.defaultPanelWidth;
+    if (!Number.isFinite(height)) height = window.innerHeight - CONFIG.defaultPanelTop - 24;
+    if (!Number.isFinite(left)) left = CONFIG.defaultPanelLeft;
+    if (!Number.isFinite(top)) top = CONFIG.defaultPanelTop;
+
+    const maxWidth = Math.max(CONFIG.minPanelWidth, Math.min(CONFIG.maxPanelWidth, viewportWidth));
+    const maxHeight = Math.max(CONFIG.minPanelHeight, viewportHeight);
+
+    width = clamp(width, CONFIG.minPanelWidth, maxWidth);
+    height = clamp(height, CONFIG.minPanelHeight, maxHeight);
+
+    left = clamp(left, 0, Math.max(0, viewportWidth - width));
+    top = clamp(top, 0, Math.max(0, viewportHeight - height));
+
+    return {
+      left: Math.round(left),
+      top: Math.round(top),
+      width: Math.round(width),
+      height: Math.round(height),
+    };
+  }
+
+  function toggleSettingsMenu() {
+    const menu = document.getElementById(CONFIG.settingsMenuId);
+    if (!menu) return;
+
+    menu.classList.toggle("is-open");
+  }
+
+  function closeSettingsMenu() {
+    const menu = document.getElementById(CONFIG.settingsMenuId);
+    if (!menu) return;
+
+    menu.classList.remove("is-open");
   }
 
   function clamp(value, min, max) {
