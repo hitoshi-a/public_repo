@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.6
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.6 move floating buttons to top right.
+// @version      0.7.9
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.9 top-left controls and Raw toggle in settings.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -63,7 +63,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.6",
+    panelTitle: "TV Custom Panel v0.7.9",
     titlePollIntervalMs: 1000,
   };
 
@@ -169,11 +169,16 @@
         flex: 0 0 auto;
       }
 
-      #${CONFIG.refreshButtonId},
-      #${CONFIG.settingsButtonId},
-      #${CONFIG.closeButtonId} {
+      #${CONFIG.settingsButtonId} {
         width: 28px;
         font-size: 14px;
+      }
+
+      #${CONFIG.closeButtonId} {
+        min-width: 58px;
+        padding: 0 8px;
+        font-size: 12px;
+        font-weight: 600;
       }
 
       #${CONFIG.renderModeButtonId},
@@ -363,7 +368,7 @@
       #${CONFIG.floatingButtonId},
       #${CONFIG.floatingAnalyzeButtonId} {
         position: fixed;
-        top: 56px;
+        top: 58px;
         z-index: 999999;
         height: 28px;
         border: 1px solid #666;
@@ -374,18 +379,18 @@
         font-weight: 600;
         cursor: pointer;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-        box-sizing: border-box;
         display: block;
       }
 
       #${CONFIG.floatingButtonId} {
-        right: 92px;
-        width: 46px;
+        left: 12px;
+        min-width: 58px;
+        padding: 0 8px;
       }
 
       #${CONFIG.floatingAnalyzeButtonId} {
-        right: 8px;
-        width: 78px;
+        left: 78px;
+        min-width: 74px;
         padding: 0 8px;
       }
 
@@ -519,6 +524,38 @@
         width: 100%;
       }
 
+      .tv-md-setting-section-label {
+        margin: 8px 0 5px;
+        font-size: 11px;
+        color: #aaa;
+      }
+
+      .tv-md-settings-action {
+        width: 100%;
+        height: 28px;
+        border: 1px solid #666;
+        border-radius: 4px;
+        background: #2b2b31;
+        color: #ddd;
+        cursor: pointer;
+        font-size: 12px;
+        margin: 0 0 6px;
+      }
+
+      .tv-md-settings-action:hover {
+        background: #3a3a42;
+      }
+
+      .tv-md-settings-action.is-active {
+        background: #4a5568;
+        border-color: #8aa4d6;
+        color: #fff;
+      }
+
+      .tv-md-settings-action.is-active:hover {
+        background: #536179;
+      }
+
       #${CONFIG.resetLayoutButtonId} {
         width: 100%;
         height: 28px;
@@ -588,8 +625,9 @@
     const refreshButton = document.createElement("button");
     refreshButton.id = CONFIG.refreshButtonId;
     refreshButton.type = "button";
+    refreshButton.className = "tv-md-settings-action";
     refreshButton.title = "Reload current ticker markdown";
-    refreshButton.textContent = "↻";
+    refreshButton.textContent = "Reload MD";
     refreshButton.addEventListener("click", function () {
       setUserHidden(false);
       loadCurrentTickerMarkdown({
@@ -612,6 +650,7 @@
     const renderModeButton = document.createElement("button");
     renderModeButton.id = CONFIG.renderModeButtonId;
     renderModeButton.type = "button";
+    renderModeButton.className = "tv-md-settings-action";
     renderModeButton.title = "Toggle markdown/raw view";
     renderModeButton.addEventListener("click", function () {
       toggleRenderMode();
@@ -645,8 +684,8 @@
     const closeButton = document.createElement("button");
     closeButton.id = CONFIG.closeButtonId;
     closeButton.type = "button";
-    closeButton.title = "Close panel";
-    closeButton.textContent = "×";
+    closeButton.title = "Toggle panel";
+    closeButton.textContent = "Panel";
     closeButton.addEventListener("click", function () {
       setUserHidden(true);
       hidePanel();
@@ -654,6 +693,9 @@
 
     const body = document.createElement("div");
     body.id = CONFIG.bodyId;
+    body.addEventListener("click", function (event) {
+      handleBodyClickForToc(event);
+    });
 
     const leftResizer = document.createElement("div");
     leftResizer.id = CONFIG.leftResizerId;
@@ -711,6 +753,7 @@
     const resetButton = document.createElement("button");
     resetButton.id = CONFIG.resetLayoutButtonId;
     resetButton.type = "button";
+    resetButton.className = "tv-md-settings-action";
     resetButton.textContent = "位置とサイズをリセット";
     resetButton.addEventListener("click", function () {
       const rect = getDefaultPanelRect();
@@ -719,20 +762,29 @@
       closeSettingsMenu();
     });
 
+    const viewLabel = document.createElement("div");
+    viewLabel.className = "tv-md-setting-section-label";
+    viewLabel.textContent = "表示";
+
+    const layoutLabel = document.createElement("div");
+    layoutLabel.className = "tv-md-setting-section-label";
+    layoutLabel.textContent = "レイアウト";
+
+    settingsMenu.appendChild(refreshButton);
+    settingsMenu.appendChild(viewLabel);
+    settingsMenu.appendChild(renderModeButton);
     settingsMenu.appendChild(opacityRow);
+    settingsMenu.appendChild(layoutLabel);
     settingsMenu.appendChild(resetButton);
     updateOpacityControl();
 
     const tocMenu = document.createElement("div");
     tocMenu.id = CONFIG.tocMenuId;
 
-    header.appendChild(refreshButton);
-    header.appendChild(settingsButton);
-    header.appendChild(renderModeButton);
-    header.appendChild(tocButton);
-    header.appendChild(analyzeButton);
     header.appendChild(title);
     header.appendChild(closeButton);
+    header.appendChild(analyzeButton);
+    header.appendChild(settingsButton);
 
     panel.appendChild(header);
     panel.appendChild(body);
@@ -782,7 +834,7 @@
     button.id = CONFIG.floatingButtonId;
     button.type = "button";
     button.title = "Show markdown panel";
-    button.textContent = "MD";
+    button.textContent = "Panel";
 
     button.addEventListener("click", function () {
       setUserHidden(false);
@@ -1193,13 +1245,10 @@
     const button = document.getElementById(CONFIG.renderModeButtonId);
     if (!button) return;
 
-    if (currentRenderMode === "raw") {
-      button.textContent = "Raw";
-      button.title = "Switch to rendered markdown view";
-    } else {
-      button.textContent = "MD";
-      button.title = "Switch to raw markdown view";
-    }
+    const isRaw = currentRenderMode === "raw";
+    button.textContent = "Raw";
+    button.title = isRaw ? "Raw view is on. Click to switch to rendered markdown view." : "Raw view is off. Click to switch to raw markdown view.";
+    button.classList.toggle("is-active", isRaw);
   }
 
   function loadRenderMode() {
@@ -1467,6 +1516,50 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#39;");
+  }
+
+  function handleBodyClickForToc(event) {
+    if (currentRenderMode !== "markdown") return;
+    if (!currentHeadings.length) return;
+
+    const menu = document.getElementById(CONFIG.tocMenuId);
+    if (menu && menu.contains(event.target)) return;
+
+    const selection = window.getSelection && window.getSelection();
+    if (selection && String(selection.toString() || "").trim()) return;
+
+    openTocMenuAt(event.clientX, event.clientY);
+    event.stopPropagation();
+  }
+
+  function openTocMenuAt(clientX, clientY) {
+    const panel = document.getElementById(CONFIG.panelId);
+    const menu = document.getElementById(CONFIG.tocMenuId);
+    if (!panel || !menu) return;
+
+    renderTocMenu();
+    menu.classList.add("is-open");
+
+    const panelRect = panel.getBoundingClientRect();
+    const menuWidth = menu.offsetWidth || 260;
+    const menuHeight = menu.offsetHeight || 260;
+
+    let left = clientX - panelRect.left;
+    let top = clientY - panelRect.top + 8;
+
+    if (left + menuWidth > panelRect.width - 8) {
+      left = panelRect.width - menuWidth - 8;
+    }
+
+    if (top + menuHeight > panelRect.height - 8) {
+      top = clientY - panelRect.top - menuHeight - 8;
+    }
+
+    left = clamp(left, 8, Math.max(8, panelRect.width - menuWidth - 8));
+    top = clamp(top, 46, Math.max(46, panelRect.height - menuHeight - 8));
+
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
   }
 
   function toggleTocMenu() {
