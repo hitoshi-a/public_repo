@@ -1,14 +1,15 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.4
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.4 left/top resize and panel opacity control.
+// @version      0.7.5
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.5 analyze prompt copy button.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
 // @connect      127.0.0.1
 // @connect      localhost
 // @grant        GM_xmlhttpRequest
+// @grant        GM_setClipboard
 // @run-at       document-idle
 // @updateURL    https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tradingview/tradingview-custom-panel.user.js
 // @downloadURL  https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tradingview/tradingview-custom-panel.user.js
@@ -27,8 +28,10 @@
     settingsButtonId: "tv-md-settings",
     renderModeButtonId: "tv-md-render-mode",
     tocButtonId: "tv-md-toc-button",
+    analyzeButtonId: "tv-md-analyze-button",
     closeButtonId: "tv-md-close",
     floatingButtonId: "tv-md-floating-button",
+    floatingAnalyzeButtonId: "tv-md-floating-analyze-button",
     titleId: "tv-md-title",
     settingsMenuId: "tv-md-settings-menu",
     tocMenuId: "tv-md-toc-menu",
@@ -60,7 +63,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.4",
+    panelTitle: "TV Custom Panel v0.7.5",
     titlePollIntervalMs: 1000,
   };
 
@@ -84,6 +87,7 @@
     injectStyle();
     createPanel();
     createFloatingButton();
+    createFloatingAnalyzeButton();
 
     currentRenderMode = loadRenderMode();
     currentPanelOpacity = loadPanelOpacity();
@@ -152,6 +156,7 @@
       #${CONFIG.settingsButtonId},
       #${CONFIG.renderModeButtonId},
       #${CONFIG.tocButtonId},
+      #${CONFIG.analyzeButtonId},
       #${CONFIG.closeButtonId} {
         height: 24px;
         border: 1px solid #666;
@@ -178,10 +183,17 @@
         font-weight: 600;
       }
 
+      #${CONFIG.analyzeButtonId} {
+        min-width: 58px;
+        padding: 0 8px;
+        font-weight: 600;
+      }
+
       #${CONFIG.refreshButtonId}:hover,
       #${CONFIG.settingsButtonId}:hover,
       #${CONFIG.renderModeButtonId}:hover,
       #${CONFIG.tocButtonId}:hover,
+      #${CONFIG.analyzeButtonId}:hover,
       #${CONFIG.closeButtonId}:hover {
         background: #3a3a42;
       }
@@ -348,12 +360,11 @@
         background: rgba(255, 255, 255, 0.32);
       }
 
-      #${CONFIG.floatingButtonId} {
+      #${CONFIG.floatingButtonId},
+      #${CONFIG.floatingAnalyzeButtonId} {
         position: fixed;
-        left: 8px;
         bottom: 32px;
         z-index: 999999;
-        width: 46px;
         height: 28px;
         border: 1px solid #666;
         border-radius: 4px;
@@ -366,7 +377,19 @@
         display: block;
       }
 
-      #${CONFIG.floatingButtonId}:hover {
+      #${CONFIG.floatingButtonId} {
+        left: 8px;
+        width: 46px;
+      }
+
+      #${CONFIG.floatingAnalyzeButtonId} {
+        left: 60px;
+        min-width: 70px;
+        padding: 0 8px;
+      }
+
+      #${CONFIG.floatingButtonId}:hover,
+      #${CONFIG.floatingAnalyzeButtonId}:hover {
         background: rgba(58, 58, 66, 0.98);
       }
 
@@ -604,6 +627,15 @@
       event.stopPropagation();
     });
 
+    const analyzeButton = document.createElement("button");
+    analyzeButton.id = CONFIG.analyzeButtonId;
+    analyzeButton.type = "button";
+    analyzeButton.title = "Copy earnings analysis prompt for current ticker";
+    analyzeButton.textContent = "Analyze";
+    analyzeButton.addEventListener("click", function () {
+      copyEarningsAnalysisPrompt(analyzeButton);
+    });
+
     const title = document.createElement("span");
     title.id = CONFIG.titleId;
     title.textContent = CONFIG.panelTitle;
@@ -697,6 +729,7 @@
     header.appendChild(settingsButton);
     header.appendChild(renderModeButton);
     header.appendChild(tocButton);
+    header.appendChild(analyzeButton);
     header.appendChild(title);
     header.appendChild(closeButton);
 
@@ -756,6 +789,22 @@
         forceReload: true,
         showErrorPanel: true,
       });
+    });
+
+    document.body.appendChild(button);
+  }
+
+  function createFloatingAnalyzeButton() {
+    if (document.getElementById(CONFIG.floatingAnalyzeButtonId)) return;
+
+    const button = document.createElement("button");
+    button.id = CONFIG.floatingAnalyzeButtonId;
+    button.type = "button";
+    button.title = "Copy earnings analysis prompt for current ticker";
+    button.textContent = "Analyze";
+
+    button.addEventListener("click", function () {
+      copyEarningsAnalysisPrompt(button);
     });
 
     document.body.appendChild(button);
@@ -1594,10 +1643,106 @@
   function updateFloatingButtonVisibility() {
     const panel = document.getElementById(CONFIG.panelId);
     const button = document.getElementById(CONFIG.floatingButtonId);
+    const analyzeButton = document.getElementById(CONFIG.floatingAnalyzeButtonId);
+    const panelVisible = panel && panel.style.display !== "none";
+
+    if (button) {
+      button.style.display = panelVisible ? "none" : "block";
+    }
+
+    if (analyzeButton) {
+      analyzeButton.style.display = panelVisible ? "none" : "block";
+    }
+  }
+
+  function copyEarningsAnalysisPrompt(button) {
+    const target = buildTargetFromCurrentTitle();
+
+    if (!target || !target.ticker || !target.filename) {
+      showAnalyzeButtonFeedback(button, "No ticker");
+      return;
+    }
+
+    const prompt = buildEarningsAnalysisPrompt(target);
+
+    copyTextToClipboard(prompt)
+      .then(function () {
+        showAnalyzeButtonFeedback(button, "Copied");
+      })
+      .catch(function (error) {
+        console.warn("[TV Custom Panel] Failed to copy earnings prompt:", error);
+        showAnalyzeButtonFeedback(button, "Copy NG");
+      });
+  }
+
+  function buildEarningsAnalysisPrompt(target) {
+    const ticker = String(target && target.ticker ? target.ticker : "").trim().toUpperCase();
+    const filename = String(target && target.filename ? target.filename : `${ticker}.md`).trim();
+
+    return [
+      `# 決算分析　対象：${ticker}`,
+      "",
+      "Codex Skill「earnings-signal-analysis」を使用してください。",
+      "SKILL.md本文を直接読んで実行してください。",
+      "frontmatter、summary、generated yaml、default_prompt、過去の記憶だけで実行しないでください。",
+      "",
+      "出力は、このCodex workspace内の以下の相対パスに保存してください。",
+      `earnings-signal-analysis/md/${filename}`,
+      "",
+      "SKILL.md本文はUTF-8として扱ってください。",
+      "もしmdファイルの日本語が文字化けしているように見える場合は、分析を続行せず、どのファイル・どの読み取りコマンドで文字化けしたかだけ報告してください。",
+      "",
+      "文字化け対策やEncoding Guardをskill本文に追加しないでください。",
+      "今回は分析結果mdの作成のみを行い、skillファイルや設定ファイルは編集しないでください。",
+    ].join("\n");
+  }
+
+  function copyTextToClipboard(text) {
+    if (typeof GM_setClipboard === "function") {
+      GM_setClipboard(text, "text");
+      return Promise.resolve();
+    }
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      return navigator.clipboard.writeText(text);
+    }
+
+    return new Promise(function (resolve, reject) {
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "readonly");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        textarea.style.top = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+
+        const copied = document.execCommand("copy");
+        document.body.removeChild(textarea);
+
+        if (copied) {
+          resolve();
+        } else {
+          reject(new Error("document.execCommand('copy') returned false"));
+        }
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  function showAnalyzeButtonFeedback(button, text) {
     if (!button) return;
 
-    const panelVisible = panel && panel.style.display !== "none";
-    button.style.display = panelVisible ? "none" : "block";
+    const originalText = button.textContent;
+    button.textContent = text;
+    button.disabled = true;
+
+    window.setTimeout(function () {
+      button.textContent = originalText || "Analyze";
+      button.disabled = false;
+    }, 1500);
   }
 
   function setupPanelMove() {
