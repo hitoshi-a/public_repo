@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.1
-// @description  Show a local markdown file in a left-side panel on TradingView. v0.1 connectivity test.
+// @version      0.2.0
+// @description  Show a local markdown file in a left-side panel on TradingView. v0.2 ticker-linked version.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -18,8 +18,7 @@
   "use strict";
 
   const CONFIG = {
-    // v0.1では固定URL。v0.2で document.title からシンボルを取得して動的化する。
-    markdownUrl: "http://127.0.0.1:8765/md/TSE_4028.md",
+    markdownBaseUrl: "http://127.0.0.1:8765/md",
 
     panelId: "tv-md-panel",
     headerId: "tv-md-panel-header",
@@ -27,8 +26,13 @@
     refreshButtonId: "tv-md-refresh",
     titleId: "tv-md-title",
 
-    panelTitle: "TV Custom Panel v0.1",
+    panelTitle: "TV Custom Panel v0.2",
+    titlePollIntervalMs: 1000,
   };
+
+  let lastTicker = null;
+  let currentTarget = null;
+  let titleWatcherId = null;
 
   function init() {
     if (!document.body) {
@@ -38,7 +42,7 @@
 
     injectStyle();
     createPanel();
-    loadMarkdown();
+    startTitleWatcher();
   }
 
   function injectStyle() {
@@ -159,9 +163,11 @@
     const refreshButton = document.createElement("button");
     refreshButton.id = CONFIG.refreshButtonId;
     refreshButton.type = "button";
-    refreshButton.title = "Reload markdown";
+    refreshButton.title = "Reload current ticker markdown";
     refreshButton.textContent = "↻";
-    refreshButton.addEventListener("click", loadMarkdown);
+    refreshButton.addEventListener("click", function () {
+      loadCurrentTickerMarkdown({ force: true });
+    });
 
     const title = document.createElement("span");
     title.id = CONFIG.titleId;
@@ -179,152 +185,290 @@
     document.body.appendChild(panel);
   }
 
-  function loadMarkdown() {
-    const panel = document.getElementById(CONFIG.panelId);
+  function startTitleWatcher() {
+    if (titleWatcherId !== null) return;
+
+    loadCurrentTickerMarkdown({ force: true });
+
+    titleWatcherId = window.setInterval(function () {
+      loadCurrentTickerMarkdown({ force: false });
+    }, CONFIG.titlePollIntervalMs);
+  }
+
+  function loadCurrentTickerMarkdown(options) {
+    const force = Boolean(options && options.force);
+    const target = buildTargetFromCurrentTitle();
+
+    if (!target) {
+      if (force || lastTicker !== "__NO_TICKER__") {
+        lastTicker = "__NO_TICKER__";
+        currentTarget = null;
+        showTickerExtractionError(document.title);
+      }
+      return;
+    }
+
+    if (!force && target.ticker === lastTicker) {
+      return;
+    }
+
+    lastTicker = target.ticker;
+    currentTarget = target;
+    loadMarkdown(target);
+  }
+
+  function buildTargetFromCurrentTitle() {
+    const ticker = extractTickerFromTitle(document.title);
+    if (!ticker) return null;
+
+    const filename = tickerToMdFilename(ticker);
+    const url = buildMarkdownUrl(filename);
+
+    return {
+      ticker: ticker,
+      filename: filename,
+      url: url,
+    };
+  }
+
+  function extractTickerFromTitle(title) {
+    const raw = String(title || "").trim();
+    if (!raw) return null;
+
+    const token = raw.split(/\s+/)[0];
+    if (!token) return null;
+
+    const normalized = token.trim().toUpperCase();
+
+    // TradingViewの汎用タイトルなどをtickerとして誤認しないための最低限の除外。
+    if (normalized === "TRADINGVIEW") return null;
+    if (normalized === "チャート") return null;
+
+    return normalized;
+  }
+
+  function tickerToMdFilename(ticker) {
+    const t = String(ticker || "").trim().toUpperCase();
+
+    // 日本株コード。通常の4桁コードに加えて、130Aのような英字入りコードも想定。
+    if (/^[0-9]{3}[0-9A-Z]$/.test(t)) {
+      return `TSE_${t}.md`;
+    }
+
+    // 米国株など。Windowsファイル名に使えない文字だけ置換。
+    return `${t.replace(/[\\/:*?"<>|]/g, "_")}.md`;
+  }
+
+  function buildMarkdownUrl(filename) {
+    const base = CONFIG.markdownBaseUrl.replace(/\/+$/, "");
+    return `${base}/${encodeURIComponent(filename)}`;
+  }
+
+  function loadMarkdown(target) {
     const title = document.getElementById(CONFIG.titleId);
     const body = document.getElementById(CONFIG.bodyId);
 
-    if (!panel || !title || !body) return;
+    if (!title || !body) return;
 
-    const url = withCacheBuster(CONFIG.markdownUrl);
+    const requestUrl = withCacheBuster(target.url);
 
-    title.textContent = CONFIG.panelTitle;
+    title.textContent = `${CONFIG.panelTitle} / ${target.filename} / loading`;
     setBodyText(
       [
         "Markdownを取得しています。",
         "",
+        "Ticker:",
+        target.ticker,
+        "",
+        "Expected file:",
+        target.filename,
+        "",
         "URL:",
-        CONFIG.markdownUrl,
+        target.url,
       ].join("\n"),
       "tv-md-loading"
     );
 
     if (typeof GM_xmlhttpRequest !== "function") {
-      showError([
-        "GM_xmlhttpRequest が利用できません。",
-        "",
-        "確認点:",
-        "- Tampermonkeyで実行されているか",
-        "- メタ情報に @grant GM_xmlhttpRequest があるか",
-        "- スクリプトを保存後にTradingViewを再読み込みしたか",
-      ].join("\n"));
+      showError(
+        [
+          "GM_xmlhttpRequest が利用できません。",
+          "",
+          "Ticker:",
+          target.ticker,
+          "",
+          "Expected file:",
+          target.filename,
+          "",
+          "URL:",
+          target.url,
+          "",
+          "確認点:",
+          "- Tampermonkeyで実行されているか",
+          "- メタ情報に @grant GM_xmlhttpRequest があるか",
+          "- スクリプトを保存後にTradingViewを再読み込みしたか",
+        ].join("\n"),
+        target
+      );
       return;
     }
 
     GM_xmlhttpRequest({
       method: "GET",
-      url: url,
+      url: requestUrl,
       timeout: 15000,
 
       onload: function (response) {
-        handleResponse(response, CONFIG.markdownUrl);
+        handleResponse(response, target);
       },
 
       onerror: function (error) {
-        showError([
-          "mdファイルを取得できません。",
-          "",
-          "理由:",
-          "通信失敗、ローカルサーバー未起動、またはTampermonkeyの @connect 設定不足の可能性があります。",
-          "",
-          "URL:",
-          CONFIG.markdownUrl,
-          "",
-          "確認点:",
-          "- start_server.bat または python -m http.server を起動しているか",
-          "- http://127.0.0.1:8765/md/TSE_4028.md をブラウザで直接開けるか",
-          "- Pythonサーバーを --bind 127.0.0.1 で起動しているか",
-          "- ポート番号が 8765 か",
-          "- Tampermonkeyメタ情報に @connect 127.0.0.1 があるか",
-          "",
-          "Error object:",
-          safeStringify(error),
-        ].join("\n"));
+        showError(
+          [
+            "mdファイルを取得できません。",
+            "",
+            "理由:",
+            "通信失敗、ローカルサーバー未起動、またはTampermonkeyの @connect 設定不足の可能性があります。",
+            "",
+            "Ticker:",
+            target.ticker,
+            "",
+            "Expected file:",
+            target.filename,
+            "",
+            "URL:",
+            target.url,
+            "",
+            "確認点:",
+            "- start_server.bat または py -3 -m http.server を起動しているか",
+            `- ${target.url} をブラウザで直接開けるか`,
+            "- Pythonサーバーを --bind 127.0.0.1 で起動しているか",
+            "- ポート番号が 8765 か",
+            "- Tampermonkeyメタ情報に @connect 127.0.0.1 があるか",
+            "",
+            "Error object:",
+            safeStringify(error),
+          ].join("\n"),
+          target
+        );
       },
 
       ontimeout: function () {
-        showError([
-          "mdファイルの取得がタイムアウトしました。",
-          "",
-          "URL:",
-          CONFIG.markdownUrl,
-          "",
-          "確認点:",
-          "- ローカルサーバーが応答しているか",
-          "- ポート番号が 8765 か",
-          "- セキュリティソフト等で遮断されていないか",
-        ].join("\n"));
+        showError(
+          [
+            "mdファイルの取得がタイムアウトしました。",
+            "",
+            "Ticker:",
+            target.ticker,
+            "",
+            "Expected file:",
+            target.filename,
+            "",
+            "URL:",
+            target.url,
+            "",
+            "確認点:",
+            "- ローカルサーバーが応答しているか",
+            "- ポート番号が 8765 か",
+            "- セキュリティソフト等で遮断されていないか",
+          ].join("\n"),
+          target
+        );
       },
     });
   }
 
-  function handleResponse(response, originalUrl) {
+  function handleResponse(response, target) {
     const status = response.status;
     const statusText = response.statusText || "";
 
     if (status >= 200 && status < 300) {
-      showMarkdown(response.responseText || "", originalUrl, status);
+      showMarkdown(response.responseText || "", target, status);
       return;
     }
 
     if (status === 404) {
-      showError([
-        "mdファイルが見つかりません。",
-        "",
-        "HTTP Status:",
-        `${status} ${statusText}`,
-        "",
-        "Expected URL:",
-        originalUrl,
-        "",
-        "Expected file:",
-        "md/TSE_4028.md",
-        "",
-        "確認点:",
-        "- mdファイルを作成したか",
-        "- ファイル名が TSE_4028.md になっているか",
-        "- ローカルサーバーのルート直下に md フォルダがあるか",
-        "- 起動ディレクトリが正しいか",
-      ].join("\n"));
+      showError(
+        [
+          "mdファイルが見つかりません。",
+          "",
+          "HTTP Status:",
+          `${status} ${statusText}`,
+          "",
+          "Ticker:",
+          target.ticker,
+          "",
+          "Expected file:",
+          target.filename,
+          "",
+          "URL:",
+          target.url,
+          "",
+          "確認点:",
+          "- mdファイルを作成したか",
+          "- ファイル名が一致しているか",
+          "- ローカルサーバーのルート直下に md フォルダがあるか",
+          "- 起動ディレクトリが正しいか",
+        ].join("\n"),
+        target
+      );
       return;
     }
 
     if (status === 403) {
-      showError([
-        "mdファイルへのアクセスが拒否されました。",
+      showError(
+        [
+          "mdファイルへのアクセスが拒否されました。",
+          "",
+          "HTTP Status:",
+          `${status} ${statusText}`,
+          "",
+          "Ticker:",
+          target.ticker,
+          "",
+          "Expected file:",
+          target.filename,
+          "",
+          "URL:",
+          target.url,
+          "",
+          "確認点:",
+          "- ローカルサーバーの公開ディレクトリが正しいか",
+          "- OSやセキュリティソフトのアクセス制限がないか",
+        ].join("\n"),
+        target
+      );
+      return;
+    }
+
+    showError(
+      [
+        "mdファイルの取得でHTTPエラーが発生しました。",
         "",
         "HTTP Status:",
         `${status} ${statusText}`,
         "",
-        "URL:",
-        originalUrl,
+        "Ticker:",
+        target.ticker,
         "",
-        "確認点:",
-        "- ローカルサーバーの公開ディレクトリが正しいか",
-        "- OSやセキュリティソフトのアクセス制限がないか",
-      ].join("\n"));
-      return;
-    }
-
-    showError([
-      "mdファイルの取得でHTTPエラーが発生しました。",
-      "",
-      "HTTP Status:",
-      `${status} ${statusText}`,
-      "",
-      "URL:",
-      originalUrl,
-      "",
-      "Response preview:",
-      previewText(response.responseText || ""),
-    ].join("\n"));
+        "Expected file:",
+        target.filename,
+        "",
+        "URL:",
+        target.url,
+        "",
+        "Response preview:",
+        previewText(response.responseText || ""),
+      ].join("\n"),
+      target
+    );
   }
 
-  function showMarkdown(markdown, originalUrl, status) {
+  function showMarkdown(markdown, target, status) {
     const title = document.getElementById(CONFIG.titleId);
 
     if (title) {
-      title.textContent = `${CONFIG.panelTitle} / loaded ${status}`;
+      title.textContent = `${CONFIG.panelTitle} / ${target.filename} / loaded ${status}`;
     }
 
     if (!markdown.trim()) {
@@ -332,8 +476,14 @@
         [
           "mdファイルは取得できましたが、内容が空です。",
           "",
+          "Ticker:",
+          target.ticker,
+          "",
+          "Expected file:",
+          target.filename,
+          "",
           "URL:",
-          originalUrl,
+          target.url,
         ].join("\n"),
         "tv-md-error"
       );
@@ -343,11 +493,40 @@
     setBodyText(markdown, "tv-md-success");
   }
 
-  function showError(message) {
+  function showTickerExtractionError(titleText) {
     const title = document.getElementById(CONFIG.titleId);
 
     if (title) {
-      title.textContent = `${CONFIG.panelTitle} / error`;
+      title.textContent = `${CONFIG.panelTitle} / ticker error`;
+    }
+
+    setBodyText(
+      [
+        "TradingViewのタブタイトルからtickerを取得できません。",
+        "",
+        "現在の document.title:",
+        String(titleText || ""),
+        "",
+        "想定:",
+        "タブタイトルの先頭にtickerがあり、その次に空白が来る形式。",
+        "",
+        "例:",
+        "TSLA 440.36 ...",
+        "4028 2,344 ...",
+      ].join("\n"),
+      "tv-md-error"
+    );
+  }
+
+  function showError(message, target) {
+    const title = document.getElementById(CONFIG.titleId);
+
+    if (title) {
+      if (target && target.filename) {
+        title.textContent = `${CONFIG.panelTitle} / ${target.filename} / error`;
+      } else {
+        title.textContent = `${CONFIG.panelTitle} / error`;
+      }
     }
 
     setBodyText(message, "tv-md-error");
