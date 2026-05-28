@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.9
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.9 top-left controls and Raw toggle in settings.
+// @version      0.7.10
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.10 stronger Raw active state and close TOC on outside click.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -63,7 +63,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.9",
+    panelTitle: "TV Custom Panel v0.7.10",
     titlePollIntervalMs: 1000,
   };
 
@@ -556,6 +556,17 @@
         background: #536179;
       }
 
+      #${CONFIG.renderModeButtonId}.is-active {
+        background: #2563eb !important;
+        border-color: #93c5fd !important;
+        color: #ffffff !important;
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+      }
+
+      #${CONFIG.renderModeButtonId}.is-active:hover {
+        background: #1d4ed8 !important;
+      }
+
       #${CONFIG.resetLayoutButtonId} {
         width: 100%;
         height: 28px;
@@ -805,7 +816,6 @@
       const settingsMenuElement = document.getElementById(CONFIG.settingsMenuId);
       const settingsButtonElement = document.getElementById(CONFIG.settingsButtonId);
       const tocMenuElement = document.getElementById(CONFIG.tocMenuId);
-      const tocButtonElement = document.getElementById(CONFIG.tocButtonId);
 
       if (
         settingsMenuElement &&
@@ -816,12 +826,7 @@
         closeSettingsMenu();
       }
 
-      if (
-        tocMenuElement &&
-        tocButtonElement &&
-        !tocMenuElement.contains(event.target) &&
-        !tocButtonElement.contains(event.target)
-      ) {
+      if (tocMenuElement && !tocMenuElement.contains(event.target)) {
         closeTocMenu();
       }
     });
