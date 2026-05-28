@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.10
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.10 stronger Raw active state and close TOC on outside click.
+// @version      0.7.11
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.11 close TOC on next body/outside click.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -63,7 +63,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.10",
+    panelTitle: "TV Custom Panel v0.7.11",
     titlePollIntervalMs: 1000,
   };
 
@@ -1530,6 +1530,12 @@
     const menu = document.getElementById(CONFIG.tocMenuId);
     if (menu && menu.contains(event.target)) return;
 
+    if (isTocMenuOpen()) {
+      closeTocMenu();
+      event.stopPropagation();
+      return;
+    }
+
     const selection = window.getSelection && window.getSelection();
     if (selection && String(selection.toString() || "").trim()) return;
 
@@ -1573,6 +1579,11 @@
 
     renderTocMenu();
     menu.classList.toggle("is-open");
+  }
+
+  function isTocMenuOpen() {
+    const menu = document.getElementById(CONFIG.tocMenuId);
+    return Boolean(menu && menu.classList.contains("is-open"));
   }
 
   function closeTocMenu() {
