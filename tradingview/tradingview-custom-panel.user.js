@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.2
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.2 session scroll memory version.
+// @version      0.7.3
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.3 simple filename and no scroll memory.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -51,13 +51,12 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.2",
+    panelTitle: "TV Custom Panel v0.7.3",
     titlePollIntervalMs: 1000,
   };
 
   let lastTicker = null;
   let currentTarget = null;
-  let displayedTarget = null;
   let titleWatcherId = null;
   let userHidden = false;
   let moveInitialized = false;
@@ -65,7 +64,6 @@
   let currentMarkdownText = "";
   let currentRenderMode = CONFIG.defaultRenderMode;
   let currentHeadings = [];
-  let scrollPositions = new Map();
 
   function init() {
     if (!document.body) {
@@ -662,8 +660,6 @@
   }
 
   function loadCurrentTickerMarkdown(options) {
-    saveCurrentScrollPosition();
-
     const forceReload = Boolean(options && options.forceReload);
     const showErrorPanel = Boolean(options && options.showErrorPanel);
     const target = buildTargetFromCurrentTitle();
@@ -731,11 +727,6 @@
 
   function tickerToMdFilename(ticker) {
     const t = String(ticker || "").trim().toUpperCase();
-
-    if (/^[0-9]{3}[0-9A-Z]$/.test(t)) {
-      return `TSE_${t}.md`;
-    }
-
     return `${t.replace(/[\\/:*?"<>|]/g, "_")}.md`;
   }
 
@@ -986,7 +977,6 @@
     }
 
     currentMarkdownText = String(markdown || "");
-    displayedTarget = target;
 
     if (!currentMarkdownText.trim()) {
       currentHeadings = [];
@@ -1006,7 +996,6 @@
         ].join("\n"),
         "tv-md-error"
       );
-      restoreDisplayedScrollPositionSoon();
       return;
     }
 
@@ -1019,18 +1008,14 @@
     if (currentRenderMode === "raw") {
       setBodyText(currentMarkdownText, "tv-md-success tv-md-raw");
       updateTocMenu();
-      restoreDisplayedScrollPositionSoon();
       return;
     }
 
     setBodyHtml(simpleMarkdownToHtml(currentMarkdownText), "tv-md-success tv-md-rendered");
     updateTocMenu();
-    restoreDisplayedScrollPositionSoon();
   }
 
   function toggleRenderMode() {
-    saveCurrentScrollPosition();
-
     currentRenderMode = currentRenderMode === "markdown" ? "raw" : "markdown";
     saveRenderMode(currentRenderMode);
     syncRenderModeButton();
@@ -1395,52 +1380,19 @@
     const offset = headingRect.top - bodyRect.top;
 
     body.scrollTop = body.scrollTop + offset - 4;
-    saveCurrentScrollPosition();
   }
 
-  function getScrollKey(target) {
-    if (!target || !target.filename) return null;
-    return target.filename;
-  }
-
-  function saveCurrentScrollPosition() {
-    const body = document.getElementById(CONFIG.bodyId);
-    const key = getScrollKey(displayedTarget);
-
-    if (!body || !key) return;
-
-    scrollPositions.set(key, Math.round(body.scrollTop || 0));
-  }
-
-  function restoreDisplayedScrollPositionSoon() {
-    const target = displayedTarget || currentTarget;
-
+  function resetBodyScrollSoon() {
     window.requestAnimationFrame(function () {
-      restoreScrollPosition(target);
-    });
-  }
-
-  function restoreScrollPosition(target) {
-    const body = document.getElementById(CONFIG.bodyId);
-    const key = getScrollKey(target);
-
-    if (!body || !key) return;
-
-    const stored = scrollPositions.get(key);
-
-    if (!Number.isFinite(stored)) {
+      const body = document.getElementById(CONFIG.bodyId);
+      if (!body) return;
       body.scrollTop = 0;
-      return;
-    }
-
-    const maxScrollTop = Math.max(0, body.scrollHeight - body.clientHeight);
-    body.scrollTop = clamp(stored, 0, maxScrollTop);
+    });
   }
 
   function showTickerExtractionError(titleText) {
     currentMarkdownText = "";
     currentHeadings = [];
-    displayedTarget = null;
     updateTocMenu();
 
     const title = document.getElementById(CONFIG.titleId);
@@ -1470,7 +1422,6 @@
   function showError(message, target) {
     currentMarkdownText = "";
     currentHeadings = [];
-    displayedTarget = null;
     updateTocMenu();
 
     const title = document.getElementById(CONFIG.titleId);
@@ -1497,8 +1448,6 @@
   }
 
   function hidePanel() {
-    saveCurrentScrollPosition();
-
     const panel = document.getElementById(CONFIG.panelId);
     if (panel) {
       panel.style.display = "none";
@@ -1801,6 +1750,7 @@
 
     body.className = className || "";
     body.textContent = text;
+    resetBodyScrollSoon();
   }
 
   function setBodyHtml(html, className) {
@@ -1809,6 +1759,7 @@
 
     body.className = className || "";
     body.innerHTML = html;
+    resetBodyScrollSoon();
   }
 
   function clamp(value, min, max) {
