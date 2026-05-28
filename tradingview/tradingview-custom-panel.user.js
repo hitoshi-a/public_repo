@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.7
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.7 robust top control container and click TOC.
+// @version      0.7.8
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.8 stable panel toggle and click TOC.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -32,7 +32,6 @@
     closeButtonId: "tv-md-close",
     floatingButtonId: "tv-md-floating-button",
     floatingAnalyzeButtonId: "tv-md-floating-analyze-button",
-    floatingControlsId: "tv-md-floating-controls",
     titleId: "tv-md-title",
     settingsMenuId: "tv-md-settings-menu",
     tocMenuId: "tv-md-toc-menu",
@@ -64,7 +63,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.7",
+    panelTitle: "TV Custom Panel v0.7.8",
     titlePollIntervalMs: 1000,
   };
 
@@ -177,12 +176,6 @@
 
       #${CONFIG.closeButtonId} {
         min-width: 58px;
-        padding: 0 8px;
-        font-weight: 600;
-      }
-
-      #${CONFIG.refreshButtonId} {
-        width: 100%;
         padding: 0 8px;
         font-size: 12px;
         font-weight: 600;
@@ -372,19 +365,11 @@
         background: rgba(255, 255, 255, 0.32);
       }
 
-      #${CONFIG.floatingControlsId} {
-        position: fixed;
-        top: 8px;
-        right: 8px;
-        z-index: 999999;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
       #${CONFIG.floatingButtonId},
       #${CONFIG.floatingAnalyzeButtonId} {
-        position: static;
+        position: fixed;
+        top: 58px;
+        z-index: 999999;
         height: 28px;
         border: 1px solid #666;
         border-radius: 4px;
@@ -398,11 +383,13 @@
       }
 
       #${CONFIG.floatingButtonId} {
+        right: 92px;
         min-width: 58px;
         padding: 0 8px;
       }
 
       #${CONFIG.floatingAnalyzeButtonId} {
+        right: 12px;
         min-width: 74px;
         padding: 0 8px;
       }
@@ -507,11 +494,12 @@
 
       #${CONFIG.settingsMenuId} {
         right: 10px;
-        min-width: 190px;
+        min-width: 180px;
         padding: 8px;
       }
 
       #${CONFIG.tocMenuId} {
+        left: 54px;
         min-width: 220px;
         max-width: 460px;
         max-height: 360px;
@@ -520,10 +508,6 @@
       }
 
       .tv-md-setting-row {
-        margin: 0 0 8px;
-      }
-
-      .tv-md-settings-action-button {
         margin: 0 0 8px;
       }
 
@@ -540,22 +524,40 @@
         width: 100%;
       }
 
-      #${CONFIG.resetLayoutButtonId},
-      .tv-md-settings-action-button {
+      .tv-md-setting-section-label {
+        margin: 8px 0 5px;
+        font-size: 11px;
+        color: #aaa;
+      }
+
+      .tv-md-settings-action {
         width: 100%;
-        min-height: 28px;
+        height: 28px;
         border: 1px solid #666;
         border-radius: 4px;
         background: #2b2b31;
         color: #ddd;
         cursor: pointer;
         font-size: 12px;
-        padding: 0 8px;
-        box-sizing: border-box;
+        margin: 0 0 6px;
       }
 
-      #${CONFIG.resetLayoutButtonId}:hover,
-      .tv-md-settings-action-button:hover {
+      .tv-md-settings-action:hover {
+        background: #3a3a42;
+      }
+
+      #${CONFIG.resetLayoutButtonId} {
+        width: 100%;
+        height: 28px;
+        border: 1px solid #666;
+        border-radius: 4px;
+        background: #2b2b31;
+        color: #ddd;
+        cursor: pointer;
+        font-size: 12px;
+      }
+
+      #${CONFIG.resetLayoutButtonId}:hover {
         background: #3a3a42;
       }
 
@@ -613,8 +615,8 @@
     const refreshButton = document.createElement("button");
     refreshButton.id = CONFIG.refreshButtonId;
     refreshButton.type = "button";
+    refreshButton.className = "tv-md-settings-action";
     refreshButton.title = "Reload current ticker markdown";
-    refreshButton.className = "tv-md-settings-action-button";
     refreshButton.textContent = "Reload MD";
     refreshButton.addEventListener("click", function () {
       setUserHidden(false);
@@ -638,8 +640,8 @@
     const renderModeButton = document.createElement("button");
     renderModeButton.id = CONFIG.renderModeButtonId;
     renderModeButton.type = "button";
+    renderModeButton.className = "tv-md-settings-action";
     renderModeButton.title = "Toggle markdown/raw view";
-    renderModeButton.className = "tv-md-settings-action-button";
     renderModeButton.addEventListener("click", function () {
       toggleRenderMode();
     });
@@ -672,7 +674,7 @@
     const closeButton = document.createElement("button");
     closeButton.id = CONFIG.closeButtonId;
     closeButton.type = "button";
-    closeButton.title = "Hide panel";
+    closeButton.title = "Toggle panel";
     closeButton.textContent = "Panel";
     closeButton.addEventListener("click", function () {
       setUserHidden(true);
@@ -681,7 +683,9 @@
 
     const body = document.createElement("div");
     body.id = CONFIG.bodyId;
-    body.addEventListener("click", handleBodyClickForToc);
+    body.addEventListener("click", function (event) {
+      handleBodyClickForToc(event);
+    });
 
     const leftResizer = document.createElement("div");
     leftResizer.id = CONFIG.leftResizerId;
@@ -739,6 +743,7 @@
     const resetButton = document.createElement("button");
     resetButton.id = CONFIG.resetLayoutButtonId;
     resetButton.type = "button";
+    resetButton.className = "tv-md-settings-action";
     resetButton.textContent = "位置とサイズをリセット";
     resetButton.addEventListener("click", function () {
       const rect = getDefaultPanelRect();
@@ -747,9 +752,19 @@
       closeSettingsMenu();
     });
 
+    const viewLabel = document.createElement("div");
+    viewLabel.className = "tv-md-setting-section-label";
+    viewLabel.textContent = "表示";
+
+    const layoutLabel = document.createElement("div");
+    layoutLabel.className = "tv-md-setting-section-label";
+    layoutLabel.textContent = "レイアウト";
+
     settingsMenu.appendChild(refreshButton);
     settingsMenu.appendChild(renderModeButton);
+    settingsMenu.appendChild(viewLabel);
     settingsMenu.appendChild(opacityRow);
+    settingsMenu.appendChild(layoutLabel);
     settingsMenu.appendChild(resetButton);
     updateOpacityControl();
 
@@ -780,6 +795,8 @@
       const settingsMenuElement = document.getElementById(CONFIG.settingsMenuId);
       const settingsButtonElement = document.getElementById(CONFIG.settingsButtonId);
       const tocMenuElement = document.getElementById(CONFIG.tocMenuId);
+      const tocButtonElement = document.getElementById(CONFIG.tocButtonId);
+
       if (
         settingsMenuElement &&
         settingsButtonElement &&
@@ -789,28 +806,20 @@
         closeSettingsMenu();
       }
 
-      if (tocMenuElement && !tocMenuElement.contains(event.target)) {
+      if (
+        tocMenuElement &&
+        tocButtonElement &&
+        !tocMenuElement.contains(event.target) &&
+        !tocButtonElement.contains(event.target)
+      ) {
         closeTocMenu();
       }
     });
   }
 
-  function getOrCreateFloatingControls() {
-    let controls = document.getElementById(CONFIG.floatingControlsId);
-
-    if (!controls) {
-      controls = document.createElement("div");
-      controls.id = CONFIG.floatingControlsId;
-      document.body.appendChild(controls);
-    }
-
-    return controls;
-  }
-
   function createFloatingButton() {
     if (document.getElementById(CONFIG.floatingButtonId)) return;
 
-    const controls = getOrCreateFloatingControls();
     const button = document.createElement("button");
     button.id = CONFIG.floatingButtonId;
     button.type = "button";
@@ -825,13 +834,12 @@
       });
     });
 
-    controls.appendChild(button);
+    document.body.appendChild(button);
   }
 
   function createFloatingAnalyzeButton() {
     if (document.getElementById(CONFIG.floatingAnalyzeButtonId)) return;
 
-    const controls = getOrCreateFloatingControls();
     const button = document.createElement("button");
     button.id = CONFIG.floatingAnalyzeButtonId;
     button.type = "button";
@@ -842,8 +850,7 @@
       copyEarningsAnalysisPrompt(button);
     });
 
-    controls.appendChild(button);
-    updateFloatingButtonVisibility();
+    document.body.appendChild(button);
   }
 
   function startTitleWatcher() {
@@ -1229,10 +1236,10 @@
     if (!button) return;
 
     if (currentRenderMode === "raw") {
-      button.textContent = "View: Raw";
+      button.textContent = "Raw";
       button.title = "Switch to rendered markdown view";
     } else {
-      button.textContent = "View: Markdown";
+      button.textContent = "Panel";
       button.title = "Switch to raw markdown view";
     }
   }
@@ -1504,6 +1511,50 @@
       .replace(/'/g, "&#39;");
   }
 
+  function handleBodyClickForToc(event) {
+    if (currentRenderMode !== "markdown") return;
+    if (!currentHeadings.length) return;
+
+    const menu = document.getElementById(CONFIG.tocMenuId);
+    if (menu && menu.contains(event.target)) return;
+
+    const selection = window.getSelection && window.getSelection();
+    if (selection && String(selection.toString() || "").trim()) return;
+
+    openTocMenuAt(event.clientX, event.clientY);
+    event.stopPropagation();
+  }
+
+  function openTocMenuAt(clientX, clientY) {
+    const panel = document.getElementById(CONFIG.panelId);
+    const menu = document.getElementById(CONFIG.tocMenuId);
+    if (!panel || !menu) return;
+
+    renderTocMenu();
+    menu.classList.add("is-open");
+
+    const panelRect = panel.getBoundingClientRect();
+    const menuWidth = menu.offsetWidth || 260;
+    const menuHeight = menu.offsetHeight || 260;
+
+    let left = clientX - panelRect.left;
+    let top = clientY - panelRect.top + 8;
+
+    if (left + menuWidth > panelRect.width - 8) {
+      left = panelRect.width - menuWidth - 8;
+    }
+
+    if (top + menuHeight > panelRect.height - 8) {
+      top = clientY - panelRect.top - menuHeight - 8;
+    }
+
+    left = clamp(left, 8, Math.max(8, panelRect.width - menuWidth - 8));
+    top = clamp(top, 46, Math.max(46, panelRect.height - menuHeight - 8));
+
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+  }
+
   function toggleTocMenu() {
     const menu = document.getElementById(CONFIG.tocMenuId);
     if (!menu) return;
@@ -1565,65 +1616,6 @@
         closeTocMenu();
       });
     });
-  }
-
-
-  function handleBodyClickForToc(event) {
-    const body = document.getElementById(CONFIG.bodyId);
-    const menu = document.getElementById(CONFIG.tocMenuId);
-
-    if (!body || !menu) return;
-    if (currentRenderMode !== "markdown") return;
-
-    const target = event.target;
-    if (target && target.closest && target.closest("a, button, input, textarea, select")) {
-      return;
-    }
-
-    const selection = window.getSelection ? String(window.getSelection()) : "";
-    if (selection.trim()) {
-      return;
-    }
-
-    closeSettingsMenu();
-    openTocMenuAtPoint(event.clientX, event.clientY);
-    event.stopPropagation();
-  }
-
-  function openTocMenuAtPoint(clientX, clientY) {
-    const panel = document.getElementById(CONFIG.panelId);
-    const menu = document.getElementById(CONFIG.tocMenuId);
-
-    if (!panel || !menu) return;
-
-    renderTocMenu();
-    menu.classList.add("is-open");
-
-    const panelRect = panel.getBoundingClientRect();
-    const initialLeft = Math.max(8, clientX - panelRect.left);
-    const initialTop = Math.max(42, clientY - panelRect.top + 8);
-
-    menu.style.left = `${Math.round(initialLeft)}px`;
-    menu.style.top = `${Math.round(initialTop)}px`;
-
-    const menuRect = menu.getBoundingClientRect();
-    const maxLeft = Math.max(8, panelRect.width - menuRect.width - 8);
-    const maxTop = Math.max(42, panelRect.height - menuRect.height - 8);
-
-    let nextLeft = initialLeft;
-    let nextTop = initialTop;
-
-    if (nextLeft > maxLeft) {
-      nextLeft = maxLeft;
-    }
-
-    if (nextTop > maxTop) {
-      const aboveTop = clientY - panelRect.top - menuRect.height - 8;
-      nextTop = aboveTop >= 42 ? aboveTop : maxTop;
-    }
-
-    menu.style.left = `${Math.round(nextLeft)}px`;
-    menu.style.top = `${Math.round(nextTop)}px`;
   }
 
   function scrollToHeading(headingId) {
@@ -1712,10 +1704,6 @@
     closeSettingsMenu();
     closeTocMenu();
     updateFloatingButtonVisibility();
-
-    window.requestAnimationFrame(function () {
-      updateFloatingButtonVisibility();
-    });
   }
 
   function setUserHidden(value) {
@@ -1741,25 +1729,16 @@
 
   function updateFloatingButtonVisibility() {
     const panel = document.getElementById(CONFIG.panelId);
-    const controls = document.getElementById(CONFIG.floatingControlsId);
     const button = document.getElementById(CONFIG.floatingButtonId);
     const analyzeButton = document.getElementById(CONFIG.floatingAnalyzeButtonId);
-
-    const panelVisible = Boolean(
-      panel &&
-      window.getComputedStyle(panel).display !== "none"
-    );
-
-    if (controls) {
-      controls.style.display = panelVisible ? "none" : "flex";
-    }
+    const panelVisible = panel && panel.style.display !== "none";
 
     if (button) {
-      button.style.display = "block";
+      button.style.display = panelVisible ? "none" : "block";
     }
 
     if (analyzeButton) {
-      analyzeButton.style.display = "block";
+      analyzeButton.style.display = panelVisible ? "none" : "block";
     }
   }
 
