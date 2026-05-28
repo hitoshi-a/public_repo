@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
-// @namespace    https://github.com/your-name/your-repo
+// @namespace    https://github.com/hitoshi-a/public_repo
 // @version      0.1.0
 // @description  Show a local markdown file in a left-side panel on TradingView. v0.1 connectivity test.
 // @match        https://www.tradingview.com/*
