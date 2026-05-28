@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.6.0
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.6 simple markdown rendering version.
+// @version      0.7.0
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7 heading navigation version.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -26,10 +26,12 @@
     refreshButtonId: "tv-md-refresh",
     settingsButtonId: "tv-md-settings",
     renderModeButtonId: "tv-md-render-mode",
+    tocButtonId: "tv-md-toc-button",
     closeButtonId: "tv-md-close",
     floatingButtonId: "tv-md-floating-button",
     titleId: "tv-md-title",
     settingsMenuId: "tv-md-settings-menu",
+    tocMenuId: "tv-md-toc-menu",
     resetLayoutButtonId: "tv-md-reset-layout",
 
     rightResizerId: "tv-md-resizer-right",
@@ -49,7 +51,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.6",
+    panelTitle: "TV Custom Panel v0.7",
     titlePollIntervalMs: 1000,
   };
 
@@ -61,6 +63,7 @@
   let resizeInitialized = false;
   let currentMarkdownText = "";
   let currentRenderMode = CONFIG.defaultRenderMode;
+  let currentHeadings = [];
 
   function init() {
     if (!document.body) {
@@ -134,6 +137,7 @@
       #${CONFIG.refreshButtonId},
       #${CONFIG.settingsButtonId},
       #${CONFIG.renderModeButtonId},
+      #${CONFIG.tocButtonId},
       #${CONFIG.closeButtonId} {
         height: 24px;
         border: 1px solid #666;
@@ -153,7 +157,8 @@
         font-size: 14px;
       }
 
-      #${CONFIG.renderModeButtonId} {
+      #${CONFIG.renderModeButtonId},
+      #${CONFIG.tocButtonId} {
         min-width: 42px;
         padding: 0 6px;
         font-weight: 600;
@@ -162,6 +167,7 @@
       #${CONFIG.refreshButtonId}:hover,
       #${CONFIG.settingsButtonId}:hover,
       #${CONFIG.renderModeButtonId}:hover,
+      #${CONFIG.tocButtonId}:hover,
       #${CONFIG.closeButtonId}:hover {
         background: #3a3a42;
       }
@@ -307,20 +313,24 @@
         margin: 14px 0;
       }
 
-      #${CONFIG.bodyId}::-webkit-scrollbar {
+      #${CONFIG.bodyId}::-webkit-scrollbar,
+      #${CONFIG.tocMenuId}::-webkit-scrollbar {
         width: 10px;
       }
 
-      #${CONFIG.bodyId}::-webkit-scrollbar-track {
+      #${CONFIG.bodyId}::-webkit-scrollbar-track,
+      #${CONFIG.tocMenuId}::-webkit-scrollbar-track {
         background: rgba(255, 255, 255, 0.04);
       }
 
-      #${CONFIG.bodyId}::-webkit-scrollbar-thumb {
+      #${CONFIG.bodyId}::-webkit-scrollbar-thumb,
+      #${CONFIG.tocMenuId}::-webkit-scrollbar-thumb {
         background: rgba(255, 255, 255, 0.22);
         border-radius: 6px;
       }
 
-      #${CONFIG.bodyId}::-webkit-scrollbar-thumb:hover {
+      #${CONFIG.bodyId}::-webkit-scrollbar-thumb:hover,
+      #${CONFIG.tocMenuId}::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.32);
       }
 
@@ -385,13 +395,11 @@
         background: rgba(255, 255, 255, 0.14);
       }
 
-      #${CONFIG.settingsMenuId} {
+      #${CONFIG.settingsMenuId},
+      #${CONFIG.tocMenuId} {
         position: absolute;
         top: 38px;
-        right: 10px;
         z-index: 4;
-        min-width: 180px;
-        padding: 8px;
         box-sizing: border-box;
         border: 1px solid #555;
         border-radius: 6px;
@@ -400,8 +408,24 @@
         display: none;
       }
 
-      #${CONFIG.settingsMenuId}.is-open {
+      #${CONFIG.settingsMenuId}.is-open,
+      #${CONFIG.tocMenuId}.is-open {
         display: block;
+      }
+
+      #${CONFIG.settingsMenuId} {
+        right: 10px;
+        min-width: 180px;
+        padding: 8px;
+      }
+
+      #${CONFIG.tocMenuId} {
+        left: 54px;
+        min-width: 220px;
+        max-width: 460px;
+        max-height: 360px;
+        overflow-y: auto;
+        padding: 8px;
       }
 
       #${CONFIG.resetLayoutButtonId} {
@@ -417,6 +441,44 @@
 
       #${CONFIG.resetLayoutButtonId}:hover {
         background: #3a3a42;
+      }
+
+      .tv-md-toc-title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #eee;
+        margin: 0 0 6px;
+      }
+
+      .tv-md-toc-empty {
+        font-size: 12px;
+        color: #bbb;
+        line-height: 1.5;
+        padding: 4px 0;
+      }
+
+      .tv-md-toc-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: #ddd;
+        cursor: pointer;
+        font-size: 12px;
+        line-height: 1.35;
+        padding: 5px 6px;
+        box-sizing: border-box;
+      }
+
+      .tv-md-toc-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .tv-md-toc-item.level-3 {
+        padding-left: 18px;
+        opacity: 0.9;
       }
     `;
 
@@ -451,6 +513,7 @@
     settingsButton.title = "Panel settings";
     settingsButton.textContent = "⚙";
     settingsButton.addEventListener("click", function (event) {
+      closeTocMenu();
       toggleSettingsMenu();
       event.stopPropagation();
     });
@@ -461,6 +524,17 @@
     renderModeButton.title = "Toggle markdown/raw view";
     renderModeButton.addEventListener("click", function () {
       toggleRenderMode();
+    });
+
+    const tocButton = document.createElement("button");
+    tocButton.id = CONFIG.tocButtonId;
+    tocButton.type = "button";
+    tocButton.title = "Show heading navigation";
+    tocButton.textContent = "TOC";
+    tocButton.addEventListener("click", function (event) {
+      closeSettingsMenu();
+      toggleTocMenu();
+      event.stopPropagation();
     });
 
     const title = document.createElement("span");
@@ -506,9 +580,13 @@
 
     settingsMenu.appendChild(resetButton);
 
+    const tocMenu = document.createElement("div");
+    tocMenu.id = CONFIG.tocMenuId;
+
     header.appendChild(refreshButton);
     header.appendChild(settingsButton);
     header.appendChild(renderModeButton);
+    header.appendChild(tocButton);
     header.appendChild(title);
     header.appendChild(closeButton);
 
@@ -518,18 +596,35 @@
     panel.appendChild(bottomResizer);
     panel.appendChild(cornerResizer);
     panel.appendChild(settingsMenu);
+    panel.appendChild(tocMenu);
 
     document.body.appendChild(panel);
 
     syncRenderModeButton();
 
     window.addEventListener("click", function (event) {
-      const menu = document.getElementById(CONFIG.settingsMenuId);
-      const button = document.getElementById(CONFIG.settingsButtonId);
-      if (!menu || !button) return;
+      const settingsMenuElement = document.getElementById(CONFIG.settingsMenuId);
+      const settingsButtonElement = document.getElementById(CONFIG.settingsButtonId);
+      const tocMenuElement = document.getElementById(CONFIG.tocMenuId);
+      const tocButtonElement = document.getElementById(CONFIG.tocButtonId);
 
-      if (menu.contains(event.target) || button.contains(event.target)) return;
-      closeSettingsMenu();
+      if (
+        settingsMenuElement &&
+        settingsButtonElement &&
+        !settingsMenuElement.contains(event.target) &&
+        !settingsButtonElement.contains(event.target)
+      ) {
+        closeSettingsMenu();
+      }
+
+      if (
+        tocMenuElement &&
+        tocButtonElement &&
+        !tocMenuElement.contains(event.target) &&
+        !tocButtonElement.contains(event.target)
+      ) {
+        closeTocMenu();
+      }
     });
   }
 
@@ -889,6 +984,8 @@
     currentMarkdownText = String(markdown || "");
 
     if (!currentMarkdownText.trim()) {
+      currentHeadings = [];
+      updateTocMenu();
       setBodyText(
         [
           "mdファイルは取得できましたが、内容が空です。",
@@ -915,16 +1012,19 @@
 
     if (currentRenderMode === "raw") {
       setBodyText(currentMarkdownText, "tv-md-success tv-md-raw");
+      updateTocMenu();
       return;
     }
 
     setBodyHtml(simpleMarkdownToHtml(currentMarkdownText), "tv-md-success tv-md-rendered");
+    updateTocMenu();
   }
 
   function toggleRenderMode() {
     currentRenderMode = currentRenderMode === "markdown" ? "raw" : "markdown";
     saveRenderMode(currentRenderMode);
     syncRenderModeButton();
+    closeTocMenu();
 
     if (currentMarkdownText) {
       renderMarkdownContent(currentMarkdownText);
@@ -969,6 +1069,8 @@
   function simpleMarkdownToHtml(markdown) {
     const lines = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
     const html = [];
+
+    currentHeadings = [];
 
     let i = 0;
     let inCodeBlock = false;
@@ -1051,7 +1153,18 @@
         flushList();
 
         const level = headingMatch[1].length;
-        html.push(`<h${level}>${formatInline(headingMatch[2].trim())}</h${level}>`);
+        const headingText = headingMatch[2].trim();
+        const headingId = `tv-md-heading-${currentHeadings.length}`;
+
+        if (level === 2 || level === 3) {
+          currentHeadings.push({
+            id: headingId,
+            level: level,
+            text: headingText,
+          });
+        }
+
+        html.push(`<h${level} id="${headingId}">${formatInline(headingText)}</h${level}>`);
         i += 1;
         continue;
       }
@@ -1172,8 +1285,86 @@
       .replace(/'/g, "&#39;");
   }
 
+  function toggleTocMenu() {
+    const menu = document.getElementById(CONFIG.tocMenuId);
+    if (!menu) return;
+
+    renderTocMenu();
+    menu.classList.toggle("is-open");
+  }
+
+  function closeTocMenu() {
+    const menu = document.getElementById(CONFIG.tocMenuId);
+    if (!menu) return;
+
+    menu.classList.remove("is-open");
+  }
+
+  function updateTocMenu() {
+    const menu = document.getElementById(CONFIG.tocMenuId);
+    if (!menu) return;
+
+    renderTocMenu();
+  }
+
+  function renderTocMenu() {
+    const menu = document.getElementById(CONFIG.tocMenuId);
+    if (!menu) return;
+
+    if (currentRenderMode !== "markdown") {
+      menu.innerHTML = [
+        '<div class="tv-md-toc-title">目次</div>',
+        '<div class="tv-md-toc-empty">Markdown表示で利用できます。</div>',
+      ].join("");
+      return;
+    }
+
+    if (!currentHeadings.length) {
+      menu.innerHTML = [
+        '<div class="tv-md-toc-title">目次</div>',
+        '<div class="tv-md-toc-empty">見出しがありません。</div>',
+      ].join("");
+      return;
+    }
+
+    const items = currentHeadings
+      .map(function (heading) {
+        return [
+          `<button type="button" class="tv-md-toc-item level-${heading.level}" data-heading-id="${escapeHtml(heading.id)}">`,
+          escapeHtml(heading.text),
+          "</button>",
+        ].join("");
+      })
+      .join("");
+
+    menu.innerHTML = `<div class="tv-md-toc-title">目次</div>${items}`;
+
+    Array.from(menu.querySelectorAll(".tv-md-toc-item")).forEach(function (button) {
+      button.addEventListener("click", function () {
+        const headingId = button.getAttribute("data-heading-id");
+        scrollToHeading(headingId);
+        closeTocMenu();
+      });
+    });
+  }
+
+  function scrollToHeading(headingId) {
+    const body = document.getElementById(CONFIG.bodyId);
+    const heading = document.getElementById(headingId);
+
+    if (!body || !heading) return;
+
+    const bodyRect = body.getBoundingClientRect();
+    const headingRect = heading.getBoundingClientRect();
+    const offset = headingRect.top - bodyRect.top;
+
+    body.scrollTop = body.scrollTop + offset - 4;
+  }
+
   function showTickerExtractionError(titleText) {
     currentMarkdownText = "";
+    currentHeadings = [];
+    updateTocMenu();
 
     const title = document.getElementById(CONFIG.titleId);
 
@@ -1201,6 +1392,8 @@
 
   function showError(message, target) {
     currentMarkdownText = "";
+    currentHeadings = [];
+    updateTocMenu();
 
     const title = document.getElementById(CONFIG.titleId);
 
@@ -1230,6 +1423,8 @@
     if (panel) {
       panel.style.display = "none";
     }
+    closeSettingsMenu();
+    closeTocMenu();
     updateFloatingButtonVisibility();
   }
 
