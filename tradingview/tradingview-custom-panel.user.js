@@ -8,7 +8,8 @@
 // @connect      localhost
 // @grant        GM_xmlhttpRequest
 // @run-at       document-idle
-// ==/UserScript==
+// @updateURL    https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tradingview/tradingview-custom-panel.user.js
+// @downloadURL  https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tradingview/tradingview-custom-panel.user.js
 
 (function () {
   "use strict";
@@ -23,7 +24,7 @@
     refreshButtonId: "tv-md-refresh",
     titleId: "tv-md-title",
 
-    panelTitle: "TV Markdown Panel v0.1",
+    panelTitle: "TV Custom Panel v0.1",
   };
 
   function init() {
