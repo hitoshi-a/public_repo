@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.12
+// @version      0.7.13
 // @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.12 linkify URLs and keep TOC click behavior.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
