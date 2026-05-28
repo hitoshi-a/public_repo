@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.5.0
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.5 free move and resize version.
+// @version      0.6.0
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.6 simple markdown rendering version.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -25,6 +25,7 @@
     bodyId: "tv-md-panel-body",
     refreshButtonId: "tv-md-refresh",
     settingsButtonId: "tv-md-settings",
+    renderModeButtonId: "tv-md-render-mode",
     closeButtonId: "tv-md-close",
     floatingButtonId: "tv-md-floating-button",
     titleId: "tv-md-title",
@@ -37,6 +38,9 @@
 
     userHiddenStorageKey: "tvCustomPanelUserHidden",
     panelRectStorageKey: "tvCustomPanelRect",
+    renderModeStorageKey: "tvCustomPanelRenderMode",
+
+    defaultRenderMode: "markdown",
 
     defaultPanelLeft: 0,
     defaultPanelTop: 56,
@@ -45,7 +49,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.5",
+    panelTitle: "TV Custom Panel v0.6",
     titlePollIntervalMs: 1000,
   };
 
@@ -55,6 +59,8 @@
   let userHidden = false;
   let moveInitialized = false;
   let resizeInitialized = false;
+  let currentMarkdownText = "";
+  let currentRenderMode = CONFIG.defaultRenderMode;
 
   function init() {
     if (!document.body) {
@@ -65,6 +71,9 @@
     injectStyle();
     createPanel();
     createFloatingButton();
+
+    currentRenderMode = loadRenderMode();
+    syncRenderModeButton();
 
     applyPanelRect(loadPanelRect());
     setupPanelMove();
@@ -124,21 +133,35 @@
 
       #${CONFIG.refreshButtonId},
       #${CONFIG.settingsButtonId},
+      #${CONFIG.renderModeButtonId},
       #${CONFIG.closeButtonId} {
-        width: 28px;
         height: 24px;
         border: 1px solid #666;
         border-radius: 4px;
         background: #2b2b31;
         color: #ddd;
         cursor: pointer;
-        font-size: 14px;
+        font-size: 12px;
         line-height: 1;
         flex: 0 0 auto;
       }
 
+      #${CONFIG.refreshButtonId},
+      #${CONFIG.settingsButtonId},
+      #${CONFIG.closeButtonId} {
+        width: 28px;
+        font-size: 14px;
+      }
+
+      #${CONFIG.renderModeButtonId} {
+        min-width: 42px;
+        padding: 0 6px;
+        font-weight: 600;
+      }
+
       #${CONFIG.refreshButtonId}:hover,
       #${CONFIG.settingsButtonId}:hover,
+      #${CONFIG.renderModeButtonId}:hover,
       #${CONFIG.closeButtonId}:hover {
         background: #3a3a42;
       }
@@ -163,6 +186,26 @@
         overflow-y: auto;
         padding: 12px;
         box-sizing: border-box;
+        color: #ddd;
+      }
+
+      #${CONFIG.bodyId}.tv-md-loading {
+        white-space: pre-wrap;
+        font-family: ui-monospace, Consolas, "Yu Gothic", "Meiryo", monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #bbb;
+      }
+
+      #${CONFIG.bodyId}.tv-md-error {
+        white-space: pre-wrap;
+        font-family: ui-monospace, Consolas, "Yu Gothic", "Meiryo", monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #f0c0c0;
+      }
+
+      #${CONFIG.bodyId}.tv-md-success.tv-md-raw {
         white-space: pre-wrap;
         font-family: ui-monospace, Consolas, "Yu Gothic", "Meiryo", monospace;
         font-size: 12px;
@@ -170,16 +213,98 @@
         color: #ddd;
       }
 
-      #${CONFIG.bodyId}.tv-md-loading {
-        color: #bbb;
-      }
-
-      #${CONFIG.bodyId}.tv-md-error {
-        color: #f0c0c0;
-      }
-
-      #${CONFIG.bodyId}.tv-md-success {
+      #${CONFIG.bodyId}.tv-md-success.tv-md-rendered {
+        white-space: normal;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Yu Gothic", "Meiryo", sans-serif;
+        font-size: 13px;
+        line-height: 1.55;
         color: #ddd;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered h1 {
+        font-size: 17px;
+        margin: 0 0 10px;
+        line-height: 1.35;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered h2 {
+        font-size: 15px;
+        margin: 16px 0 8px;
+        border-bottom: 1px solid #555;
+        padding-bottom: 4px;
+        line-height: 1.35;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered h3 {
+        font-size: 14px;
+        margin: 12px 0 6px;
+        line-height: 1.35;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered p {
+        margin: 6px 0;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered ul,
+      #${CONFIG.bodyId}.tv-md-rendered ol {
+        margin: 6px 0 8px;
+        padding-left: 22px;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered li {
+        margin: 2px 0;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0 12px;
+        font-size: 12px;
+        table-layout: auto;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered th,
+      #${CONFIG.bodyId}.tv-md-rendered td {
+        border: 1px solid #555;
+        padding: 4px 6px;
+        vertical-align: top;
+        word-break: break-word;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered th {
+        background: rgba(255, 255, 255, 0.08);
+        font-weight: 600;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered pre {
+        white-space: pre-wrap;
+        overflow-x: auto;
+        padding: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid #555;
+        border-radius: 4px;
+        font-family: ui-monospace, Consolas, "Yu Gothic", "Meiryo", monospace;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered code {
+        font-family: ui-monospace, Consolas, "Yu Gothic", "Meiryo", monospace;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 3px;
+        padding: 1px 3px;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered pre code {
+        background: transparent;
+        border-radius: 0;
+        padding: 0;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered hr {
+        border: 0;
+        border-top: 1px solid #555;
+        margin: 14px 0;
       }
 
       #${CONFIG.bodyId}::-webkit-scrollbar {
@@ -330,6 +455,14 @@
       event.stopPropagation();
     });
 
+    const renderModeButton = document.createElement("button");
+    renderModeButton.id = CONFIG.renderModeButtonId;
+    renderModeButton.type = "button";
+    renderModeButton.title = "Toggle markdown/raw view";
+    renderModeButton.addEventListener("click", function () {
+      toggleRenderMode();
+    });
+
     const title = document.createElement("span");
     title.id = CONFIG.titleId;
     title.textContent = CONFIG.panelTitle;
@@ -375,6 +508,7 @@
 
     header.appendChild(refreshButton);
     header.appendChild(settingsButton);
+    header.appendChild(renderModeButton);
     header.appendChild(title);
     header.appendChild(closeButton);
 
@@ -386,6 +520,8 @@
     panel.appendChild(settingsMenu);
 
     document.body.appendChild(panel);
+
+    syncRenderModeButton();
 
     window.addEventListener("click", function (event) {
       const menu = document.getElementById(CONFIG.settingsMenuId);
@@ -750,7 +886,9 @@
       title.textContent = `${CONFIG.panelTitle} / ${target.filename} / loaded ${status}`;
     }
 
-    if (!markdown.trim()) {
+    currentMarkdownText = String(markdown || "");
+
+    if (!currentMarkdownText.trim()) {
       setBodyText(
         [
           "mdファイルは取得できましたが、内容が空です。",
@@ -769,10 +907,274 @@
       return;
     }
 
-    setBodyText(markdown, "tv-md-success");
+    renderMarkdownContent(currentMarkdownText);
+  }
+
+  function renderMarkdownContent(markdown) {
+    currentMarkdownText = String(markdown || "");
+
+    if (currentRenderMode === "raw") {
+      setBodyText(currentMarkdownText, "tv-md-success tv-md-raw");
+      return;
+    }
+
+    setBodyHtml(simpleMarkdownToHtml(currentMarkdownText), "tv-md-success tv-md-rendered");
+  }
+
+  function toggleRenderMode() {
+    currentRenderMode = currentRenderMode === "markdown" ? "raw" : "markdown";
+    saveRenderMode(currentRenderMode);
+    syncRenderModeButton();
+
+    if (currentMarkdownText) {
+      renderMarkdownContent(currentMarkdownText);
+    }
+  }
+
+  function syncRenderModeButton() {
+    const button = document.getElementById(CONFIG.renderModeButtonId);
+    if (!button) return;
+
+    if (currentRenderMode === "raw") {
+      button.textContent = "Raw";
+      button.title = "Switch to rendered markdown view";
+    } else {
+      button.textContent = "MD";
+      button.title = "Switch to raw markdown view";
+    }
+  }
+
+  function loadRenderMode() {
+    try {
+      const value = localStorage.getItem(CONFIG.renderModeStorageKey);
+      if (value === "raw" || value === "markdown") {
+        return value;
+      }
+      return CONFIG.defaultRenderMode;
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to load render mode:", error);
+      return CONFIG.defaultRenderMode;
+    }
+  }
+
+  function saveRenderMode(mode) {
+    try {
+      const normalized = mode === "raw" ? "raw" : "markdown";
+      localStorage.setItem(CONFIG.renderModeStorageKey, normalized);
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to save render mode:", error);
+    }
+  }
+
+  function simpleMarkdownToHtml(markdown) {
+    const lines = String(markdown || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    const html = [];
+
+    let i = 0;
+    let inCodeBlock = false;
+    let codeLines = [];
+    let paragraphLines = [];
+    let listType = null;
+    let listItems = [];
+
+    function flushParagraph() {
+      if (!paragraphLines.length) return;
+      html.push(`<p>${paragraphLines.map(formatInline).join("<br>")}</p>`);
+      paragraphLines = [];
+    }
+
+    function flushList() {
+      if (!listType || !listItems.length) return;
+      const tag = listType;
+      html.push(`<${tag}>${listItems.map((item) => `<li>${formatInline(item)}</li>`).join("")}</${tag}>`);
+      listType = null;
+      listItems = [];
+    }
+
+    function flushCodeBlock() {
+      html.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
+      codeLines = [];
+    }
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (inCodeBlock) {
+        if (/^```/.test(trimmed)) {
+          inCodeBlock = false;
+          flushCodeBlock();
+        } else {
+          codeLines.push(line);
+        }
+        i += 1;
+        continue;
+      }
+
+      if (/^```/.test(trimmed)) {
+        flushParagraph();
+        flushList();
+        inCodeBlock = true;
+        codeLines = [];
+        i += 1;
+        continue;
+      }
+
+      if (trimmed === "") {
+        flushParagraph();
+        flushList();
+        i += 1;
+        continue;
+      }
+
+      if (isMarkdownTableStart(lines, i)) {
+        flushParagraph();
+        flushList();
+
+        const tableResult = parseMarkdownTable(lines, i);
+        html.push(tableResult.html);
+        i = tableResult.nextIndex;
+        continue;
+      }
+
+      if (/^-{3,}$/.test(trimmed)) {
+        flushParagraph();
+        flushList();
+        html.push("<hr>");
+        i += 1;
+        continue;
+      }
+
+      const headingMatch = /^(#{1,3})\s+(.+)$/.exec(line);
+      if (headingMatch) {
+        flushParagraph();
+        flushList();
+
+        const level = headingMatch[1].length;
+        html.push(`<h${level}>${formatInline(headingMatch[2].trim())}</h${level}>`);
+        i += 1;
+        continue;
+      }
+
+      const unorderedMatch = /^[-*]\s+(.+)$/.exec(line);
+      if (unorderedMatch) {
+        flushParagraph();
+
+        if (listType && listType !== "ul") {
+          flushList();
+        }
+
+        listType = "ul";
+        listItems.push(unorderedMatch[1].trim());
+        i += 1;
+        continue;
+      }
+
+      const orderedMatch = /^\d+\.\s+(.+)$/.exec(line);
+      if (orderedMatch) {
+        flushParagraph();
+
+        if (listType && listType !== "ol") {
+          flushList();
+        }
+
+        listType = "ol";
+        listItems.push(orderedMatch[1].trim());
+        i += 1;
+        continue;
+      }
+
+      flushList();
+      paragraphLines.push(line.trim());
+      i += 1;
+    }
+
+    if (inCodeBlock) {
+      flushCodeBlock();
+    }
+
+    flushParagraph();
+    flushList();
+
+    return html.join("\n");
+  }
+
+  function isMarkdownTableStart(lines, index) {
+    if (index + 1 >= lines.length) return false;
+
+    const header = lines[index].trim();
+    const separator = lines[index + 1].trim();
+
+    if (!isMarkdownTableRow(header)) return false;
+    if (!isMarkdownTableRow(separator)) return false;
+
+    const separatorCells = parseMarkdownTableRow(separator);
+
+    if (!separatorCells.length) return false;
+
+    return separatorCells.every(function (cell) {
+      return /^:?-{3,}:?$/.test(cell.trim());
+    });
+  }
+
+  function parseMarkdownTable(lines, startIndex) {
+    const headerCells = parseMarkdownTableRow(lines[startIndex]);
+    const bodyRows = [];
+    let index = startIndex + 2;
+
+    while (index < lines.length && isMarkdownTableRow(lines[index].trim())) {
+      bodyRows.push(parseMarkdownTableRow(lines[index]));
+      index += 1;
+    }
+
+    const thead = `<thead><tr>${headerCells
+      .map((cell) => `<th>${formatInline(cell.trim())}</th>`)
+      .join("")}</tr></thead>`;
+
+    const tbody = `<tbody>${bodyRows
+      .map(function (row) {
+        return `<tr>${row.map((cell) => `<td>${formatInline(cell.trim())}</td>`).join("")}</tr>`;
+      })
+      .join("")}</tbody>`;
+
+    return {
+      html: `<table>${thead}${tbody}</table>`,
+      nextIndex: index,
+    };
+  }
+
+  function isMarkdownTableRow(line) {
+    const text = String(line || "").trim();
+    return text.startsWith("|") && text.endsWith("|") && text.includes("|");
+  }
+
+  function parseMarkdownTableRow(line) {
+    const text = String(line || "").trim();
+    const withoutOuterPipes = text.replace(/^\|/, "").replace(/\|$/, "");
+    return withoutOuterPipes.split("|").map((cell) => cell.trim());
+  }
+
+  function formatInline(text) {
+    let escaped = escapeHtml(text);
+
+    escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
+    escaped = escaped.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+    return escaped;
+  }
+
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   function showTickerExtractionError(titleText) {
+    currentMarkdownText = "";
+
     const title = document.getElementById(CONFIG.titleId);
 
     if (title) {
@@ -798,6 +1200,8 @@
   }
 
   function showError(message, target) {
+    currentMarkdownText = "";
+
     const title = document.getElementById(CONFIG.titleId);
 
     showPanel();
@@ -1116,20 +1520,28 @@
     menu.classList.remove("is-open");
   }
 
-  function clamp(value, min, max) {
-    return Math.min(Math.max(value, min), max);
-  }
-
-  function isStaleTarget(target) {
-    return !currentTarget || currentTarget.ticker !== target.ticker;
-  }
-
   function setBodyText(text, className) {
     const body = document.getElementById(CONFIG.bodyId);
     if (!body) return;
 
     body.className = className || "";
     body.textContent = text;
+  }
+
+  function setBodyHtml(html, className) {
+    const body = document.getElementById(CONFIG.bodyId);
+    if (!body) return;
+
+    body.className = className || "";
+    body.innerHTML = html;
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function isStaleTarget(target) {
+    return !currentTarget || currentTarget.ticker !== target.ticker;
   }
 
   function withCacheBuster(url) {
