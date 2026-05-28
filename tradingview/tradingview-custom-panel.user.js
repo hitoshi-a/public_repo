@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.5
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.5 analyze prompt copy button.
+// @version      0.7.6
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.6 compact top controls and click TOC.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -63,7 +63,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.5",
+    panelTitle: "TV Custom Panel v0.7.6",
     titlePollIntervalMs: 1000,
   };
 
@@ -169,11 +169,22 @@
         flex: 0 0 auto;
       }
 
-      #${CONFIG.refreshButtonId},
-      #${CONFIG.settingsButtonId},
-      #${CONFIG.closeButtonId} {
+      #${CONFIG.settingsButtonId} {
         width: 28px;
         font-size: 14px;
+      }
+
+      #${CONFIG.closeButtonId} {
+        min-width: 58px;
+        padding: 0 8px;
+        font-weight: 600;
+      }
+
+      #${CONFIG.refreshButtonId} {
+        width: 100%;
+        padding: 0 8px;
+        font-size: 12px;
+        font-weight: 600;
       }
 
       #${CONFIG.renderModeButtonId},
@@ -363,7 +374,7 @@
       #${CONFIG.floatingButtonId},
       #${CONFIG.floatingAnalyzeButtonId} {
         position: fixed;
-        bottom: 32px;
+        top: 8px;
         z-index: 999999;
         height: 28px;
         border: 1px solid #666;
@@ -378,13 +389,14 @@
       }
 
       #${CONFIG.floatingButtonId} {
-        left: 8px;
-        width: 46px;
+        right: 90px;
+        min-width: 58px;
+        padding: 0 8px;
       }
 
       #${CONFIG.floatingAnalyzeButtonId} {
-        left: 60px;
-        min-width: 70px;
+        right: 8px;
+        min-width: 74px;
         padding: 0 8px;
       }
 
@@ -488,12 +500,11 @@
 
       #${CONFIG.settingsMenuId} {
         right: 10px;
-        min-width: 180px;
+        min-width: 190px;
         padding: 8px;
       }
 
       #${CONFIG.tocMenuId} {
-        left: 54px;
         min-width: 220px;
         max-width: 460px;
         max-height: 360px;
@@ -502,6 +513,10 @@
       }
 
       .tv-md-setting-row {
+        margin: 0 0 8px;
+      }
+
+      .tv-md-settings-action-button {
         margin: 0 0 8px;
       }
 
@@ -518,18 +533,22 @@
         width: 100%;
       }
 
-      #${CONFIG.resetLayoutButtonId} {
+      #${CONFIG.resetLayoutButtonId},
+      .tv-md-settings-action-button {
         width: 100%;
-        height: 28px;
+        min-height: 28px;
         border: 1px solid #666;
         border-radius: 4px;
         background: #2b2b31;
         color: #ddd;
         cursor: pointer;
         font-size: 12px;
+        padding: 0 8px;
+        box-sizing: border-box;
       }
 
-      #${CONFIG.resetLayoutButtonId}:hover {
+      #${CONFIG.resetLayoutButtonId}:hover,
+      .tv-md-settings-action-button:hover {
         background: #3a3a42;
       }
 
@@ -588,7 +607,8 @@
     refreshButton.id = CONFIG.refreshButtonId;
     refreshButton.type = "button";
     refreshButton.title = "Reload current ticker markdown";
-    refreshButton.textContent = "↻";
+    refreshButton.className = "tv-md-settings-action-button";
+    refreshButton.textContent = "Reload MD";
     refreshButton.addEventListener("click", function () {
       setUserHidden(false);
       loadCurrentTickerMarkdown({
@@ -612,6 +632,7 @@
     renderModeButton.id = CONFIG.renderModeButtonId;
     renderModeButton.type = "button";
     renderModeButton.title = "Toggle markdown/raw view";
+    renderModeButton.className = "tv-md-settings-action-button";
     renderModeButton.addEventListener("click", function () {
       toggleRenderMode();
     });
@@ -644,8 +665,8 @@
     const closeButton = document.createElement("button");
     closeButton.id = CONFIG.closeButtonId;
     closeButton.type = "button";
-    closeButton.title = "Close panel";
-    closeButton.textContent = "×";
+    closeButton.title = "Hide panel";
+    closeButton.textContent = "Panel";
     closeButton.addEventListener("click", function () {
       setUserHidden(true);
       hidePanel();
@@ -653,6 +674,7 @@
 
     const body = document.createElement("div");
     body.id = CONFIG.bodyId;
+    body.addEventListener("click", handleBodyClickForToc);
 
     const leftResizer = document.createElement("div");
     leftResizer.id = CONFIG.leftResizerId;
@@ -718,6 +740,8 @@
       closeSettingsMenu();
     });
 
+    settingsMenu.appendChild(refreshButton);
+    settingsMenu.appendChild(renderModeButton);
     settingsMenu.appendChild(opacityRow);
     settingsMenu.appendChild(resetButton);
     updateOpacityControl();
@@ -725,13 +749,10 @@
     const tocMenu = document.createElement("div");
     tocMenu.id = CONFIG.tocMenuId;
 
-    header.appendChild(refreshButton);
-    header.appendChild(settingsButton);
-    header.appendChild(renderModeButton);
-    header.appendChild(tocButton);
-    header.appendChild(analyzeButton);
     header.appendChild(title);
     header.appendChild(closeButton);
+    header.appendChild(analyzeButton);
+    header.appendChild(settingsButton);
 
     panel.appendChild(header);
     panel.appendChild(body);
@@ -752,8 +773,6 @@
       const settingsMenuElement = document.getElementById(CONFIG.settingsMenuId);
       const settingsButtonElement = document.getElementById(CONFIG.settingsButtonId);
       const tocMenuElement = document.getElementById(CONFIG.tocMenuId);
-      const tocButtonElement = document.getElementById(CONFIG.tocButtonId);
-
       if (
         settingsMenuElement &&
         settingsButtonElement &&
@@ -763,12 +782,7 @@
         closeSettingsMenu();
       }
 
-      if (
-        tocMenuElement &&
-        tocButtonElement &&
-        !tocMenuElement.contains(event.target) &&
-        !tocButtonElement.contains(event.target)
-      ) {
+      if (tocMenuElement && !tocMenuElement.contains(event.target)) {
         closeTocMenu();
       }
     });
@@ -781,7 +795,7 @@
     button.id = CONFIG.floatingButtonId;
     button.type = "button";
     button.title = "Show markdown panel";
-    button.textContent = "MD";
+    button.textContent = "Panel";
 
     button.addEventListener("click", function () {
       setUserHidden(false);
@@ -1193,10 +1207,10 @@
     if (!button) return;
 
     if (currentRenderMode === "raw") {
-      button.textContent = "Raw";
+      button.textContent = "View: Raw";
       button.title = "Switch to rendered markdown view";
     } else {
-      button.textContent = "MD";
+      button.textContent = "View: Markdown";
       button.title = "Switch to raw markdown view";
     }
   }
@@ -1529,6 +1543,65 @@
         closeTocMenu();
       });
     });
+  }
+
+
+  function handleBodyClickForToc(event) {
+    const body = document.getElementById(CONFIG.bodyId);
+    const menu = document.getElementById(CONFIG.tocMenuId);
+
+    if (!body || !menu) return;
+    if (currentRenderMode !== "markdown") return;
+
+    const target = event.target;
+    if (target && target.closest && target.closest("a, button, input, textarea, select")) {
+      return;
+    }
+
+    const selection = window.getSelection ? String(window.getSelection()) : "";
+    if (selection.trim()) {
+      return;
+    }
+
+    closeSettingsMenu();
+    openTocMenuAtPoint(event.clientX, event.clientY);
+    event.stopPropagation();
+  }
+
+  function openTocMenuAtPoint(clientX, clientY) {
+    const panel = document.getElementById(CONFIG.panelId);
+    const menu = document.getElementById(CONFIG.tocMenuId);
+
+    if (!panel || !menu) return;
+
+    renderTocMenu();
+    menu.classList.add("is-open");
+
+    const panelRect = panel.getBoundingClientRect();
+    const initialLeft = Math.max(8, clientX - panelRect.left);
+    const initialTop = Math.max(42, clientY - panelRect.top + 8);
+
+    menu.style.left = `${Math.round(initialLeft)}px`;
+    menu.style.top = `${Math.round(initialTop)}px`;
+
+    const menuRect = menu.getBoundingClientRect();
+    const maxLeft = Math.max(8, panelRect.width - menuRect.width - 8);
+    const maxTop = Math.max(42, panelRect.height - menuRect.height - 8);
+
+    let nextLeft = initialLeft;
+    let nextTop = initialTop;
+
+    if (nextLeft > maxLeft) {
+      nextLeft = maxLeft;
+    }
+
+    if (nextTop > maxTop) {
+      const aboveTop = clientY - panelRect.top - menuRect.height - 8;
+      nextTop = aboveTop >= 42 ? aboveTop : maxTop;
+    }
+
+    menu.style.left = `${Math.round(nextLeft)}px`;
+    menu.style.top = `${Math.round(nextTop)}px`;
   }
 
   function scrollToHeading(headingId) {
