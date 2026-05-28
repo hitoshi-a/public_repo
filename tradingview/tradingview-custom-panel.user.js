@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.3
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.3 simple filename and no scroll memory.
+// @version      0.7.4
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.4 left/top resize and panel opacity control.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -33,7 +33,12 @@
     settingsMenuId: "tv-md-settings-menu",
     tocMenuId: "tv-md-toc-menu",
     resetLayoutButtonId: "tv-md-reset-layout",
+    opacityRangeId: "tv-md-opacity-range",
+    opacityValueId: "tv-md-opacity-value",
 
+    leftResizerId: "tv-md-resizer-left",
+    topResizerId: "tv-md-resizer-top",
+    topLeftResizerId: "tv-md-resizer-top-left",
     rightResizerId: "tv-md-resizer-right",
     bottomResizerId: "tv-md-resizer-bottom",
     cornerResizerId: "tv-md-resizer-corner",
@@ -41,8 +46,12 @@
     userHiddenStorageKey: "tvCustomPanelUserHidden",
     panelRectStorageKey: "tvCustomPanelRect",
     renderModeStorageKey: "tvCustomPanelRenderMode",
+    panelOpacityStorageKey: "tvCustomPanelOpacity",
 
     defaultRenderMode: "markdown",
+    defaultPanelOpacity: 0.97,
+    minPanelOpacity: 0.55,
+    maxPanelOpacity: 1.0,
 
     defaultPanelLeft: 0,
     defaultPanelTop: 56,
@@ -51,7 +60,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.3",
+    panelTitle: "TV Custom Panel v0.7.4",
     titlePollIntervalMs: 1000,
   };
 
@@ -63,6 +72,7 @@
   let resizeInitialized = false;
   let currentMarkdownText = "";
   let currentRenderMode = CONFIG.defaultRenderMode;
+  let currentPanelOpacity = CONFIG.defaultPanelOpacity;
   let currentHeadings = [];
 
   function init() {
@@ -76,7 +86,9 @@
     createFloatingButton();
 
     currentRenderMode = loadRenderMode();
+    currentPanelOpacity = loadPanelOpacity();
     syncRenderModeButton();
+    applyPanelOpacity(currentPanelOpacity);
 
     applyPanelRect(loadPanelRect());
     setupPanelMove();
@@ -111,7 +123,9 @@
         min-width: ${CONFIG.minPanelWidth}px;
         min-height: ${CONFIG.minPanelHeight}px;
         z-index: 999999;
-        background: rgba(20, 20, 24, 0.97);
+        --tv-md-panel-alpha: 0.97;
+        --tv-md-header-alpha: 0.98;
+        background: rgba(20, 20, 24, var(--tv-md-panel-alpha));
         color: #ddd;
         border: 1px solid #555;
         box-sizing: border-box;
@@ -128,7 +142,7 @@
         padding: 0 10px;
         border-bottom: 1px solid #444;
         box-sizing: border-box;
-        background: rgba(28, 28, 32, 0.98);
+        background: rgba(28, 28, 32, var(--tv-md-header-alpha));
         color: #eee;
         font-size: 12px;
         user-select: none;
@@ -356,6 +370,39 @@
         background: rgba(58, 58, 66, 0.98);
       }
 
+      #${CONFIG.leftResizerId} {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 7px;
+        height: 100%;
+        cursor: ew-resize;
+        background: transparent;
+        z-index: 2;
+      }
+
+      #${CONFIG.topResizerId} {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 7px;
+        cursor: ns-resize;
+        background: transparent;
+        z-index: 2;
+      }
+
+      #${CONFIG.topLeftResizerId} {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 14px;
+        height: 14px;
+        cursor: nwse-resize;
+        background: rgba(255, 255, 255, 0.08);
+        z-index: 3;
+      }
+
       #${CONFIG.rightResizerId} {
         position: absolute;
         top: 0;
@@ -389,6 +436,9 @@
         z-index: 3;
       }
 
+      #${CONFIG.leftResizerId}:hover,
+      #${CONFIG.topResizerId}:hover,
+      #${CONFIG.topLeftResizerId}:hover,
       #${CONFIG.rightResizerId}:hover,
       #${CONFIG.bottomResizerId}:hover,
       #${CONFIG.cornerResizerId}:hover {
@@ -403,7 +453,7 @@
         box-sizing: border-box;
         border: 1px solid #555;
         border-radius: 6px;
-        background: rgba(28, 28, 32, 0.98);
+        background: rgba(28, 28, 32, var(--tv-md-header-alpha));
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
         display: none;
       }
@@ -426,6 +476,23 @@
         max-height: 360px;
         overflow-y: auto;
         padding: 8px;
+      }
+
+      .tv-md-setting-row {
+        margin: 0 0 8px;
+      }
+
+      .tv-md-setting-label {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 0 0 5px;
+        font-size: 12px;
+        color: #ddd;
+      }
+
+      #${CONFIG.opacityRangeId} {
+        width: 100%;
       }
 
       #${CONFIG.resetLayoutButtonId} {
@@ -555,6 +622,15 @@
     const body = document.createElement("div");
     body.id = CONFIG.bodyId;
 
+    const leftResizer = document.createElement("div");
+    leftResizer.id = CONFIG.leftResizerId;
+
+    const topResizer = document.createElement("div");
+    topResizer.id = CONFIG.topResizerId;
+
+    const topLeftResizer = document.createElement("div");
+    topLeftResizer.id = CONFIG.topLeftResizerId;
+
     const rightResizer = document.createElement("div");
     rightResizer.id = CONFIG.rightResizerId;
 
@@ -567,6 +643,38 @@
     const settingsMenu = document.createElement("div");
     settingsMenu.id = CONFIG.settingsMenuId;
 
+    const opacityRow = document.createElement("div");
+    opacityRow.className = "tv-md-setting-row";
+
+    const opacityLabel = document.createElement("div");
+    opacityLabel.className = "tv-md-setting-label";
+
+    const opacityLabelText = document.createElement("span");
+    opacityLabelText.textContent = "透明度";
+
+    const opacityValue = document.createElement("span");
+    opacityValue.id = CONFIG.opacityValueId;
+
+    opacityLabel.appendChild(opacityLabelText);
+    opacityLabel.appendChild(opacityValue);
+
+    const opacityRange = document.createElement("input");
+    opacityRange.id = CONFIG.opacityRangeId;
+    opacityRange.type = "range";
+    opacityRange.min = String(Math.round(CONFIG.minPanelOpacity * 100));
+    opacityRange.max = String(Math.round(CONFIG.maxPanelOpacity * 100));
+    opacityRange.step = "1";
+    opacityRange.value = String(Math.round(currentPanelOpacity * 100));
+    opacityRange.addEventListener("input", function () {
+      const opacity = normalizePanelOpacity(Number(opacityRange.value) / 100);
+      currentPanelOpacity = opacity;
+      applyPanelOpacity(opacity);
+      savePanelOpacity(opacity);
+    });
+
+    opacityRow.appendChild(opacityLabel);
+    opacityRow.appendChild(opacityRange);
+
     const resetButton = document.createElement("button");
     resetButton.id = CONFIG.resetLayoutButtonId;
     resetButton.type = "button";
@@ -578,7 +686,9 @@
       closeSettingsMenu();
     });
 
+    settingsMenu.appendChild(opacityRow);
     settingsMenu.appendChild(resetButton);
+    updateOpacityControl();
 
     const tocMenu = document.createElement("div");
     tocMenu.id = CONFIG.tocMenuId;
@@ -592,6 +702,9 @@
 
     panel.appendChild(header);
     panel.appendChild(body);
+    panel.appendChild(leftResizer);
+    panel.appendChild(topResizer);
+    panel.appendChild(topLeftResizer);
     panel.appendChild(rightResizer);
     panel.appendChild(bottomResizer);
     panel.appendChild(cornerResizer);
@@ -1546,11 +1659,14 @@
     if (resizeInitialized) return;
 
     const panel = document.getElementById(CONFIG.panelId);
+    const leftResizer = document.getElementById(CONFIG.leftResizerId);
+    const topResizer = document.getElementById(CONFIG.topResizerId);
+    const topLeftResizer = document.getElementById(CONFIG.topLeftResizerId);
     const rightResizer = document.getElementById(CONFIG.rightResizerId);
     const bottomResizer = document.getElementById(CONFIG.bottomResizerId);
     const cornerResizer = document.getElementById(CONFIG.cornerResizerId);
 
-    if (!panel || !rightResizer || !bottomResizer || !cornerResizer) return;
+    if (!panel || !leftResizer || !topResizer || !topLeftResizer || !rightResizer || !bottomResizer || !cornerResizer) return;
 
     let resizeMode = null;
     let startX = 0;
@@ -1563,9 +1679,9 @@
       startY = event.clientY;
       startRect = getPanelRect();
 
-      if (mode === "right") {
+      if (mode === "left" || mode === "right") {
         document.body.style.cursor = "ew-resize";
-      } else if (mode === "bottom") {
+      } else if (mode === "top" || mode === "bottom") {
         document.body.style.cursor = "ns-resize";
       } else {
         document.body.style.cursor = "nwse-resize";
@@ -1576,6 +1692,18 @@
       event.preventDefault();
       event.stopPropagation();
     }
+
+    leftResizer.addEventListener("mousedown", function (event) {
+      startResize("left", event);
+    });
+
+    topResizer.addEventListener("mousedown", function (event) {
+      startResize("top", event);
+    });
+
+    topLeftResizer.addEventListener("mousedown", function (event) {
+      startResize("top-left", event);
+    });
 
     rightResizer.addEventListener("mousedown", function (event) {
       startResize("right", event);
@@ -1601,6 +1729,30 @@
         width: startRect.width,
         height: startRect.height,
       };
+
+      if (resizeMode === "left" || resizeMode === "top-left") {
+        const viewportWidth = Math.max(window.innerWidth || 0, CONFIG.minPanelWidth);
+        const maxWidth = Math.max(
+          CONFIG.minPanelWidth,
+          Math.min(CONFIG.maxPanelWidth, viewportWidth)
+        );
+        const fixedRight = startRect.left + startRect.width;
+        const minLeft = Math.max(0, fixedRight - maxWidth);
+        const maxLeft = Math.max(minLeft, fixedRight - CONFIG.minPanelWidth);
+
+        nextRect.left = clamp(startRect.left + deltaX, minLeft, maxLeft);
+        nextRect.width = fixedRight - nextRect.left;
+      }
+
+      if (resizeMode === "top" || resizeMode === "top-left") {
+        const viewportHeight = Math.max(window.innerHeight || 0, CONFIG.minPanelHeight);
+        const fixedBottom = startRect.top + startRect.height;
+        const minTop = Math.max(0, fixedBottom - viewportHeight);
+        const maxTop = Math.max(minTop, fixedBottom - CONFIG.minPanelHeight);
+
+        nextRect.top = clamp(startRect.top + deltaY, minTop, maxTop);
+        nextRect.height = fixedBottom - nextRect.top;
+      }
 
       if (resizeMode === "right" || resizeMode === "corner") {
         nextRect.width = startRect.width + deltaX;
@@ -1728,6 +1880,65 @@
       width: Math.round(width),
       height: Math.round(height),
     };
+  }
+
+  function loadPanelOpacity() {
+    try {
+      const raw = localStorage.getItem(CONFIG.panelOpacityStorageKey);
+      if (raw === null) return CONFIG.defaultPanelOpacity;
+      return normalizePanelOpacity(Number(raw));
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to load panel opacity:", error);
+      return CONFIG.defaultPanelOpacity;
+    }
+  }
+
+  function savePanelOpacity(opacity) {
+    try {
+      localStorage.setItem(
+        CONFIG.panelOpacityStorageKey,
+        String(normalizePanelOpacity(opacity))
+      );
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to save panel opacity:", error);
+    }
+  }
+
+  function applyPanelOpacity(opacity) {
+    const panel = document.getElementById(CONFIG.panelId);
+    if (!panel) return;
+
+    const normalized = normalizePanelOpacity(opacity);
+    const headerAlpha = normalizePanelOpacity(Math.min(1, normalized + 0.01));
+
+    panel.style.setProperty("--tv-md-panel-alpha", String(normalized));
+    panel.style.setProperty("--tv-md-header-alpha", String(headerAlpha));
+
+    updateOpacityControl();
+  }
+
+  function updateOpacityControl() {
+    const range = document.getElementById(CONFIG.opacityRangeId);
+    const value = document.getElementById(CONFIG.opacityValueId);
+    const percent = Math.round(normalizePanelOpacity(currentPanelOpacity) * 100);
+
+    if (range) {
+      range.value = String(percent);
+    }
+
+    if (value) {
+      value.textContent = `${percent}%`;
+    }
+  }
+
+  function normalizePanelOpacity(value) {
+    const opacity = Number(value);
+
+    if (!Number.isFinite(opacity)) {
+      return CONFIG.defaultPanelOpacity;
+    }
+
+    return clamp(opacity, CONFIG.minPanelOpacity, CONFIG.maxPanelOpacity);
   }
 
   function toggleSettingsMenu() {
