@@ -19,7 +19,7 @@
   "use strict";
 
   const CONFIG = {
-    markdownBaseUrl: "http://127.0.0.1:8765/md",
+    markdownBaseUrl: "http://127.0.0.1:8765/earnings-signal-analysis/md",
 
     panelId: "tv-md-panel",
     headerId: "tv-md-panel-header",
