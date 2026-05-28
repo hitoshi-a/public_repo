@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.3.0
-// @description  Show a local markdown file in a left-side panel on TradingView. v0.3 visibility control version.
+// @version      0.3.1
+// @description  Show a local markdown file in a left-side panel on TradingView. v0.3.1 auto-open only when markdown exists.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -30,7 +30,7 @@
 
     userHiddenStorageKey: "tvCustomPanelUserHidden",
 
-    panelTitle: "TV Custom Panel v0.3",
+    panelTitle: "TV Custom Panel v0.3.1",
     titlePollIntervalMs: 1000,
   };
 
@@ -51,11 +51,13 @@
 
     userHidden = loadUserHidden();
 
-    if (userHidden) {
-      hidePanel();
-    } else {
-      showPanel();
-      loadCurrentTickerMarkdown({ force: true });
+    hidePanel();
+
+    if (!userHidden) {
+      loadCurrentTickerMarkdown({
+        forceReload: true,
+        showErrorPanel: false,
+      });
     }
 
     startTitleWatcher();
@@ -82,6 +84,7 @@
         box-sizing: border-box;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         box-shadow: 2px 0 8px rgba(0, 0, 0, 0.35);
+        display: none;
       }
 
       #${CONFIG.headerId} {
@@ -181,6 +184,7 @@
         font-weight: 600;
         cursor: pointer;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+        display: block;
       }
 
       #${CONFIG.floatingButtonId}:hover {
@@ -207,8 +211,10 @@
     refreshButton.textContent = "↻";
     refreshButton.addEventListener("click", function () {
       setUserHidden(false);
-      showPanel();
-      loadCurrentTickerMarkdown({ force: true });
+      loadCurrentTickerMarkdown({
+        forceReload: true,
+        showErrorPanel: true,
+      });
     });
 
     const title = document.createElement("span");
@@ -249,8 +255,10 @@
 
     button.addEventListener("click", function () {
       setUserHidden(false);
-      showPanel();
-      loadCurrentTickerMarkdown({ force: true });
+      loadCurrentTickerMarkdown({
+        forceReload: true,
+        showErrorPanel: true,
+      });
     });
 
     document.body.appendChild(button);
@@ -260,37 +268,48 @@
     if (titleWatcherId !== null) return;
 
     titleWatcherId = window.setInterval(function () {
-      loadCurrentTickerMarkdown({ force: false });
+      loadCurrentTickerMarkdown({
+        forceReload: false,
+        showErrorPanel: false,
+      });
     }, CONFIG.titlePollIntervalMs);
   }
 
   function loadCurrentTickerMarkdown(options) {
-    const force = Boolean(options && options.force);
+    const forceReload = Boolean(options && options.forceReload);
+    const showErrorPanel = Boolean(options && options.showErrorPanel);
     const target = buildTargetFromCurrentTitle();
 
     if (!target) {
-      if (!userHidden && (force || lastTicker !== "__NO_TICKER__")) {
+      if (forceReload || lastTicker !== "__NO_TICKER__") {
         lastTicker = "__NO_TICKER__";
         currentTarget = null;
-        showPanel();
-        showTickerExtractionError(document.title);
+
+        if (showErrorPanel && !userHidden) {
+          showPanel();
+          showTickerExtractionError(document.title);
+        } else {
+          hidePanel();
+        }
       }
       return;
     }
 
-    if (!force && target.ticker === lastTicker) {
+    if (!forceReload && target.ticker === lastTicker) {
       return;
     }
 
     lastTicker = target.ticker;
     currentTarget = target;
 
-    if (userHidden && !force) {
+    if (userHidden && !showErrorPanel) {
+      hidePanel();
       return;
     }
 
-    showPanel();
-    loadMarkdown(target);
+    loadMarkdown(target, {
+      showErrorPanel: showErrorPanel,
+    });
   }
 
   function buildTargetFromCurrentTitle() {
@@ -337,7 +356,8 @@
     return `${base}/${encodeURIComponent(filename)}`;
   }
 
-  function loadMarkdown(target) {
+  function loadMarkdown(target, options) {
+    const showErrorPanel = Boolean(options && options.showErrorPanel);
     const title = document.getElementById(CONFIG.titleId);
     const body = document.getElementById(CONFIG.bodyId);
 
@@ -345,27 +365,79 @@
 
     const requestUrl = withCacheBuster(target.url);
 
-    title.textContent = `${CONFIG.panelTitle} / ${target.filename} / loading`;
-    setBodyText(
-      [
-        "Markdownを取得しています。",
-        "",
-        "Ticker:",
-        target.ticker,
-        "",
-        "Expected file:",
-        target.filename,
-        "",
-        "URL:",
-        target.url,
-      ].join("\n"),
-      "tv-md-loading"
-    );
+    if (showErrorPanel) {
+      showPanel();
+      title.textContent = `${CONFIG.panelTitle} / ${target.filename} / loading`;
+      setBodyText(
+        [
+          "Markdownを取得しています。",
+          "",
+          "Ticker:",
+          target.ticker,
+          "",
+          "Expected file:",
+          target.filename,
+          "",
+          "URL:",
+          target.url,
+        ].join("\n"),
+        "tv-md-loading"
+      );
+    } else {
+      hidePanel();
+    }
 
     if (typeof GM_xmlhttpRequest !== "function") {
-      showError(
-        [
-          "GM_xmlhttpRequest が利用できません。",
+      if (showErrorPanel) {
+        showError(
+          [
+            "GM_xmlhttpRequest が利用できません。",
+            "",
+            "Ticker:",
+            target.ticker,
+            "",
+            "Expected file:",
+            target.filename,
+            "",
+            "URL:",
+            target.url,
+            "",
+            "確認点:",
+            "- Tampermonkeyで実行されているか",
+            "- メタ情報に @grant GM_xmlhttpRequest があるか",
+            "- スクリプトを保存後にTradingViewを再読み込みしたか",
+          ].join("\n"),
+          target
+        );
+      } else {
+        hidePanel();
+      }
+      return;
+    }
+
+    GM_xmlhttpRequest({
+      method: "GET",
+      url: requestUrl,
+      timeout: 15000,
+
+      onload: function (response) {
+        if (isStaleTarget(target)) return;
+        if (userHidden) return;
+
+        handleResponse(response, target, {
+          showErrorPanel: showErrorPanel,
+        });
+      },
+
+      onerror: function (error) {
+        if (isStaleTarget(target)) return;
+        if (userHidden) return;
+
+        const message = [
+          "mdファイルを取得できません。",
+          "",
+          "理由:",
+          "通信失敗、ローカルサーバー未起動、またはTampermonkeyの @connect 設定不足の可能性があります。",
           "",
           "Ticker:",
           target.ticker,
@@ -377,86 +449,67 @@
           target.url,
           "",
           "確認点:",
-          "- Tampermonkeyで実行されているか",
-          "- メタ情報に @grant GM_xmlhttpRequest があるか",
-          "- スクリプトを保存後にTradingViewを再読み込みしたか",
-        ].join("\n"),
-        target
-      );
-      return;
-    }
+          "- start_server.bat または py -3 -m http.server を起動しているか",
+          `- ${target.url} をブラウザで直接開けるか`,
+          "- Pythonサーバーを --bind 127.0.0.1 で起動しているか",
+          "- ポート番号が 8765 か",
+          "- Tampermonkeyメタ情報に @connect 127.0.0.1 があるか",
+          "",
+          "Error object:",
+          safeStringify(error),
+        ].join("\n");
 
-    GM_xmlhttpRequest({
-      method: "GET",
-      url: requestUrl,
-      timeout: 15000,
-
-      onload: function (response) {
-        handleResponse(response, target);
-      },
-
-      onerror: function (error) {
-        showError(
-          [
-            "mdファイルを取得できません。",
-            "",
-            "理由:",
-            "通信失敗、ローカルサーバー未起動、またはTampermonkeyの @connect 設定不足の可能性があります。",
-            "",
-            "Ticker:",
-            target.ticker,
-            "",
-            "Expected file:",
-            target.filename,
-            "",
-            "URL:",
-            target.url,
-            "",
-            "確認点:",
-            "- start_server.bat または py -3 -m http.server を起動しているか",
-            `- ${target.url} をブラウザで直接開けるか`,
-            "- Pythonサーバーを --bind 127.0.0.1 で起動しているか",
-            "- ポート番号が 8765 か",
-            "- Tampermonkeyメタ情報に @connect 127.0.0.1 があるか",
-            "",
-            "Error object:",
-            safeStringify(error),
-          ].join("\n"),
-          target
-        );
+        if (showErrorPanel) {
+          showError(message, target);
+        } else {
+          hidePanel();
+        }
       },
 
       ontimeout: function () {
-        showError(
-          [
-            "mdファイルの取得がタイムアウトしました。",
-            "",
-            "Ticker:",
-            target.ticker,
-            "",
-            "Expected file:",
-            target.filename,
-            "",
-            "URL:",
-            target.url,
-            "",
-            "確認点:",
-            "- ローカルサーバーが応答しているか",
-            "- ポート番号が 8765 か",
-            "- セキュリティソフト等で遮断されていないか",
-          ].join("\n"),
-          target
-        );
+        if (isStaleTarget(target)) return;
+        if (userHidden) return;
+
+        const message = [
+          "mdファイルの取得がタイムアウトしました。",
+          "",
+          "Ticker:",
+          target.ticker,
+          "",
+          "Expected file:",
+          target.filename,
+          "",
+          "URL:",
+          target.url,
+          "",
+          "確認点:",
+          "- ローカルサーバーが応答しているか",
+          "- ポート番号が 8765 か",
+          "- セキュリティソフト等で遮断されていないか",
+        ].join("\n");
+
+        if (showErrorPanel) {
+          showError(message, target);
+        } else {
+          hidePanel();
+        }
       },
     });
   }
 
-  function handleResponse(response, target) {
+  function handleResponse(response, target, options) {
+    const showErrorPanel = Boolean(options && options.showErrorPanel);
     const status = response.status;
     const statusText = response.statusText || "";
 
     if (status >= 200 && status < 300) {
+      showPanel();
       showMarkdown(response.responseText || "", target, status);
+      return;
+    }
+
+    if (!showErrorPanel) {
+      hidePanel();
       return;
     }
 
@@ -594,6 +647,8 @@
   function showError(message, target) {
     const title = document.getElementById(CONFIG.titleId);
 
+    showPanel();
+
     if (title) {
       if (target && target.filename) {
         title.textContent = `${CONFIG.panelTitle} / ${target.filename} / error`;
@@ -643,10 +698,16 @@
   }
 
   function updateFloatingButtonVisibility() {
+    const panel = document.getElementById(CONFIG.panelId);
     const button = document.getElementById(CONFIG.floatingButtonId);
     if (!button) return;
 
-    button.style.display = userHidden ? "block" : "none";
+    const panelVisible = panel && panel.style.display !== "none";
+    button.style.display = panelVisible ? "none" : "block";
+  }
+
+  function isStaleTarget(target) {
+    return !currentTarget || currentTarget.ticker !== target.ticker;
   }
 
   function setBodyText(text, className) {
