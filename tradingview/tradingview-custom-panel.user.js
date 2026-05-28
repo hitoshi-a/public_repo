@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.11
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.11 close TOC on next body/outside click.
+// @version      0.7.12
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.12 linkify URLs and keep TOC click behavior.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -63,7 +63,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.11",
+    panelTitle: "TV Custom Panel v0.7.12",
     titlePollIntervalMs: 1000,
   };
 
@@ -336,6 +336,16 @@
         background: transparent;
         border-radius: 0;
         padding: 0;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered a {
+        color: #8ab4f8;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+
+      #${CONFIG.bodyId}.tv-md-rendered a:hover {
+        color: #adc8ff;
       }
 
       #${CONFIG.bodyId}.tv-md-rendered hr {
@@ -1506,12 +1516,44 @@
   }
 
   function formatInline(text) {
-    let escaped = escapeHtml(text);
+    let raw = String(text || "");
+    const placeholders = [];
 
-    escaped = escaped.replace(/`([^`]+)`/g, "<code>$1</code>");
+    function stashHtml(html) {
+      const index = placeholders.length;
+      placeholders.push(html);
+      return `\uE000${index}\uE001`;
+    }
+
+    raw = raw.replace(/`([^`]+)`/g, function (_match, codeText) {
+      return stashHtml(`<code>${escapeHtml(codeText)}</code>`);
+    });
+
+    raw = raw.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (_match, label, url) {
+      return stashHtml(buildAnchorHtml(url, escapeHtml(label)));
+    });
+
+    let escaped = escapeHtml(raw);
+
+    escaped = escaped.replace(/\bhttps?:\/\/[^\s<>()"']+/g, function (url) {
+      let trailing = "";
+      while (/[.,;:!?]$/.test(url)) {
+        trailing = url.slice(-1) + trailing;
+        url = url.slice(0, -1);
+      }
+      return buildAnchorHtml(url, url) + trailing;
+    });
+
     escaped = escaped.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 
-    return escaped;
+    return escaped.replace(/\\uE000(\d+)\\uE001/g, function (_match, index) {
+      return placeholders[Number(index)] || "";
+    });
+  }
+
+  function buildAnchorHtml(url, labelHtml) {
+    const href = escapeHtml(url);
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${labelHtml}</a>`;
   }
 
   function escapeHtml(text) {
@@ -1526,6 +1568,10 @@
   function handleBodyClickForToc(event) {
     if (currentRenderMode !== "markdown") return;
     if (!currentHeadings.length) return;
+
+    if (event.target && event.target.closest && event.target.closest("a")) {
+      return;
+    }
 
     const menu = document.getElementById(CONFIG.tocMenuId);
     if (menu && menu.contains(event.target)) return;
