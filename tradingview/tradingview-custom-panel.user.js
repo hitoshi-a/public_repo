@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.2.0
-// @description  Show a local markdown file in a left-side panel on TradingView. v0.2 ticker-linked version.
+// @version      0.3.0
+// @description  Show a local markdown file in a left-side panel on TradingView. v0.3 visibility control version.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -24,15 +24,20 @@
     headerId: "tv-md-panel-header",
     bodyId: "tv-md-panel-body",
     refreshButtonId: "tv-md-refresh",
+    closeButtonId: "tv-md-close",
+    floatingButtonId: "tv-md-floating-button",
     titleId: "tv-md-title",
 
-    panelTitle: "TV Custom Panel v0.2",
+    userHiddenStorageKey: "tvCustomPanelUserHidden",
+
+    panelTitle: "TV Custom Panel v0.3",
     titlePollIntervalMs: 1000,
   };
 
   let lastTicker = null;
   let currentTarget = null;
   let titleWatcherId = null;
+  let userHidden = false;
 
   function init() {
     if (!document.body) {
@@ -42,6 +47,17 @@
 
     injectStyle();
     createPanel();
+    createFloatingButton();
+
+    userHidden = loadUserHidden();
+
+    if (userHidden) {
+      hidePanel();
+    } else {
+      showPanel();
+      loadCurrentTickerMarkdown({ force: true });
+    }
+
     startTitleWatcher();
   }
 
@@ -82,7 +98,8 @@
         user-select: none;
       }
 
-      #${CONFIG.refreshButtonId} {
+      #${CONFIG.refreshButtonId},
+      #${CONFIG.closeButtonId} {
         width: 28px;
         height: 24px;
         border: 1px solid #666;
@@ -92,9 +109,11 @@
         cursor: pointer;
         font-size: 14px;
         line-height: 1;
+        flex: 0 0 auto;
       }
 
-      #${CONFIG.refreshButtonId}:hover {
+      #${CONFIG.refreshButtonId}:hover,
+      #${CONFIG.closeButtonId}:hover {
         background: #3a3a42;
       }
 
@@ -146,6 +165,27 @@
       #${CONFIG.bodyId}::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.32);
       }
+
+      #${CONFIG.floatingButtonId} {
+        position: fixed;
+        left: 8px;
+        bottom: 32px;
+        z-index: 999999;
+        width: 46px;
+        height: 28px;
+        border: 1px solid #666;
+        border-radius: 4px;
+        background: rgba(28, 28, 32, 0.95);
+        color: #ddd;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      }
+
+      #${CONFIG.floatingButtonId}:hover {
+        background: rgba(58, 58, 66, 0.98);
+      }
     `;
 
     document.head.appendChild(style);
@@ -166,6 +206,8 @@
     refreshButton.title = "Reload current ticker markdown";
     refreshButton.textContent = "↻";
     refreshButton.addEventListener("click", function () {
+      setUserHidden(false);
+      showPanel();
       loadCurrentTickerMarkdown({ force: true });
     });
 
@@ -173,11 +215,22 @@
     title.id = CONFIG.titleId;
     title.textContent = CONFIG.panelTitle;
 
+    const closeButton = document.createElement("button");
+    closeButton.id = CONFIG.closeButtonId;
+    closeButton.type = "button";
+    closeButton.title = "Close panel";
+    closeButton.textContent = "×";
+    closeButton.addEventListener("click", function () {
+      setUserHidden(true);
+      hidePanel();
+    });
+
     const body = document.createElement("div");
     body.id = CONFIG.bodyId;
 
     header.appendChild(refreshButton);
     header.appendChild(title);
+    header.appendChild(closeButton);
 
     panel.appendChild(header);
     panel.appendChild(body);
@@ -185,10 +238,26 @@
     document.body.appendChild(panel);
   }
 
+  function createFloatingButton() {
+    if (document.getElementById(CONFIG.floatingButtonId)) return;
+
+    const button = document.createElement("button");
+    button.id = CONFIG.floatingButtonId;
+    button.type = "button";
+    button.title = "Show markdown panel";
+    button.textContent = "MD";
+
+    button.addEventListener("click", function () {
+      setUserHidden(false);
+      showPanel();
+      loadCurrentTickerMarkdown({ force: true });
+    });
+
+    document.body.appendChild(button);
+  }
+
   function startTitleWatcher() {
     if (titleWatcherId !== null) return;
-
-    loadCurrentTickerMarkdown({ force: true });
 
     titleWatcherId = window.setInterval(function () {
       loadCurrentTickerMarkdown({ force: false });
@@ -200,9 +269,10 @@
     const target = buildTargetFromCurrentTitle();
 
     if (!target) {
-      if (force || lastTicker !== "__NO_TICKER__") {
+      if (!userHidden && (force || lastTicker !== "__NO_TICKER__")) {
         lastTicker = "__NO_TICKER__";
         currentTarget = null;
+        showPanel();
         showTickerExtractionError(document.title);
       }
       return;
@@ -214,6 +284,12 @@
 
     lastTicker = target.ticker;
     currentTarget = target;
+
+    if (userHidden && !force) {
+      return;
+    }
+
+    showPanel();
     loadMarkdown(target);
   }
 
@@ -240,7 +316,6 @@
 
     const normalized = token.trim().toUpperCase();
 
-    // TradingViewの汎用タイトルなどをtickerとして誤認しないための最低限の除外。
     if (normalized === "TRADINGVIEW") return null;
     if (normalized === "チャート") return null;
 
@@ -250,12 +325,10 @@
   function tickerToMdFilename(ticker) {
     const t = String(ticker || "").trim().toUpperCase();
 
-    // 日本株コード。通常の4桁コードに加えて、130Aのような英字入りコードも想定。
     if (/^[0-9]{3}[0-9A-Z]$/.test(t)) {
       return `TSE_${t}.md`;
     }
 
-    // 米国株など。Windowsファイル名に使えない文字だけ置換。
     return `${t.replace(/[\\/:*?"<>|]/g, "_")}.md`;
   }
 
@@ -530,6 +603,50 @@
     }
 
     setBodyText(message, "tv-md-error");
+  }
+
+  function showPanel() {
+    const panel = document.getElementById(CONFIG.panelId);
+    if (panel) {
+      panel.style.display = "block";
+    }
+    updateFloatingButtonVisibility();
+  }
+
+  function hidePanel() {
+    const panel = document.getElementById(CONFIG.panelId);
+    if (panel) {
+      panel.style.display = "none";
+    }
+    updateFloatingButtonVisibility();
+  }
+
+  function setUserHidden(value) {
+    userHidden = Boolean(value);
+
+    try {
+      localStorage.setItem(CONFIG.userHiddenStorageKey, userHidden ? "1" : "0");
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to save userHidden:", error);
+    }
+
+    updateFloatingButtonVisibility();
+  }
+
+  function loadUserHidden() {
+    try {
+      return localStorage.getItem(CONFIG.userHiddenStorageKey) === "1";
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to load userHidden:", error);
+      return false;
+    }
+  }
+
+  function updateFloatingButtonVisibility() {
+    const button = document.getElementById(CONFIG.floatingButtonId);
+    if (!button) return;
+
+    button.style.display = userHidden ? "block" : "none";
   }
 
   function setBodyText(text, className) {
