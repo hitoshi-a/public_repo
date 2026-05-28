@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.6
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.6 compact top controls and click TOC.
+// @version      0.7.7
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.7 robust top control container and click TOC.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -32,6 +32,7 @@
     closeButtonId: "tv-md-close",
     floatingButtonId: "tv-md-floating-button",
     floatingAnalyzeButtonId: "tv-md-floating-analyze-button",
+    floatingControlsId: "tv-md-floating-controls",
     titleId: "tv-md-title",
     settingsMenuId: "tv-md-settings-menu",
     tocMenuId: "tv-md-toc-menu",
@@ -63,7 +64,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.6",
+    panelTitle: "TV Custom Panel v0.7.7",
     titlePollIntervalMs: 1000,
   };
 
@@ -371,11 +372,19 @@
         background: rgba(255, 255, 255, 0.32);
       }
 
-      #${CONFIG.floatingButtonId},
-      #${CONFIG.floatingAnalyzeButtonId} {
+      #${CONFIG.floatingControlsId} {
         position: fixed;
         top: 8px;
+        right: 8px;
         z-index: 999999;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      #${CONFIG.floatingButtonId},
+      #${CONFIG.floatingAnalyzeButtonId} {
+        position: static;
         height: 28px;
         border: 1px solid #666;
         border-radius: 4px;
@@ -389,13 +398,11 @@
       }
 
       #${CONFIG.floatingButtonId} {
-        right: 90px;
         min-width: 58px;
         padding: 0 8px;
       }
 
       #${CONFIG.floatingAnalyzeButtonId} {
-        right: 8px;
         min-width: 74px;
         padding: 0 8px;
       }
@@ -788,9 +795,22 @@
     });
   }
 
+  function getOrCreateFloatingControls() {
+    let controls = document.getElementById(CONFIG.floatingControlsId);
+
+    if (!controls) {
+      controls = document.createElement("div");
+      controls.id = CONFIG.floatingControlsId;
+      document.body.appendChild(controls);
+    }
+
+    return controls;
+  }
+
   function createFloatingButton() {
     if (document.getElementById(CONFIG.floatingButtonId)) return;
 
+    const controls = getOrCreateFloatingControls();
     const button = document.createElement("button");
     button.id = CONFIG.floatingButtonId;
     button.type = "button";
@@ -805,12 +825,13 @@
       });
     });
 
-    document.body.appendChild(button);
+    controls.appendChild(button);
   }
 
   function createFloatingAnalyzeButton() {
     if (document.getElementById(CONFIG.floatingAnalyzeButtonId)) return;
 
+    const controls = getOrCreateFloatingControls();
     const button = document.createElement("button");
     button.id = CONFIG.floatingAnalyzeButtonId;
     button.type = "button";
@@ -821,7 +842,8 @@
       copyEarningsAnalysisPrompt(button);
     });
 
-    document.body.appendChild(button);
+    controls.appendChild(button);
+    updateFloatingButtonVisibility();
   }
 
   function startTitleWatcher() {
@@ -1690,6 +1712,10 @@
     closeSettingsMenu();
     closeTocMenu();
     updateFloatingButtonVisibility();
+
+    window.requestAnimationFrame(function () {
+      updateFloatingButtonVisibility();
+    });
   }
 
   function setUserHidden(value) {
@@ -1715,16 +1741,25 @@
 
   function updateFloatingButtonVisibility() {
     const panel = document.getElementById(CONFIG.panelId);
+    const controls = document.getElementById(CONFIG.floatingControlsId);
     const button = document.getElementById(CONFIG.floatingButtonId);
     const analyzeButton = document.getElementById(CONFIG.floatingAnalyzeButtonId);
-    const panelVisible = panel && panel.style.display !== "none";
+
+    const panelVisible = Boolean(
+      panel &&
+      window.getComputedStyle(panel).display !== "none"
+    );
+
+    if (controls) {
+      controls.style.display = panelVisible ? "none" : "flex";
+    }
 
     if (button) {
-      button.style.display = panelVisible ? "none" : "block";
+      button.style.display = "block";
     }
 
     if (analyzeButton) {
-      analyzeButton.style.display = panelVisible ? "none" : "block";
+      analyzeButton.style.display = "block";
     }
   }
 
