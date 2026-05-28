@@ -10,6 +10,7 @@
 // @run-at       document-idle
 // @updateURL    https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tradingview/tradingview-custom-panel.user.js
 // @downloadURL  https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tradingview/tradingview-custom-panel.user.js
+// ==/UserScript==
 
 (function () {
   "use strict";
