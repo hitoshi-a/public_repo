@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.3.1
-// @description  Show a local markdown file in a left-side panel on TradingView. v0.3.1 auto-open only when markdown exists.
+// @version      0.4.0
+// @description  Show a local markdown file in a left-side panel on TradingView. v0.4 resizable panel version.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -27,10 +27,16 @@
     closeButtonId: "tv-md-close",
     floatingButtonId: "tv-md-floating-button",
     titleId: "tv-md-title",
+    resizerId: "tv-md-panel-resizer",
 
     userHiddenStorageKey: "tvCustomPanelUserHidden",
+    panelWidthStorageKey: "tvCustomPanelWidth",
 
-    panelTitle: "TV Custom Panel v0.3.1",
+    defaultPanelWidth: 480,
+    minPanelWidth: 320,
+    maxPanelWidth: 900,
+
+    panelTitle: "TV Custom Panel v0.4",
     titlePollIntervalMs: 1000,
   };
 
@@ -38,6 +44,7 @@
   let currentTarget = null;
   let titleWatcherId = null;
   let userHidden = false;
+  let resizerInitialized = false;
 
   function init() {
     if (!document.body) {
@@ -48,6 +55,9 @@
     injectStyle();
     createPanel();
     createFloatingButton();
+
+    applyPanelWidth(loadPanelWidth());
+    setupPanelResizer();
 
     userHidden = loadUserHidden();
 
@@ -74,9 +84,9 @@
         top: 56px;
         left: 0;
         bottom: 24px;
-        width: 480px;
-        min-width: 320px;
-        max-width: 900px;
+        width: ${CONFIG.defaultPanelWidth}px;
+        min-width: ${CONFIG.minPanelWidth}px;
+        max-width: ${CONFIG.maxPanelWidth}px;
         z-index: 999999;
         background: rgba(20, 20, 24, 0.97);
         color: #ddd;
@@ -190,6 +200,21 @@
       #${CONFIG.floatingButtonId}:hover {
         background: rgba(58, 58, 66, 0.98);
       }
+
+      #${CONFIG.resizerId} {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 6px;
+        height: 100%;
+        cursor: ew-resize;
+        background: transparent;
+        z-index: 1;
+      }
+
+      #${CONFIG.resizerId}:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
     `;
 
     document.head.appendChild(style);
@@ -234,12 +259,16 @@
     const body = document.createElement("div");
     body.id = CONFIG.bodyId;
 
+    const resizer = document.createElement("div");
+    resizer.id = CONFIG.resizerId;
+
     header.appendChild(refreshButton);
     header.appendChild(title);
     header.appendChild(closeButton);
 
     panel.appendChild(header);
     panel.appendChild(body);
+    panel.appendChild(resizer);
 
     document.body.appendChild(panel);
   }
@@ -704,6 +733,93 @@
 
     const panelVisible = panel && panel.style.display !== "none";
     button.style.display = panelVisible ? "none" : "block";
+  }
+
+  function setupPanelResizer() {
+    if (resizerInitialized) return;
+
+    const panel = document.getElementById(CONFIG.panelId);
+    const resizer = document.getElementById(CONFIG.resizerId);
+    if (!panel || !resizer) return;
+
+    let isDragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    resizer.addEventListener("mousedown", function (event) {
+      isDragging = true;
+      startX = event.clientX;
+      startWidth = panel.getBoundingClientRect().width;
+
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+
+      event.preventDefault();
+      event.stopPropagation();
+    });
+
+    window.addEventListener("mousemove", function (event) {
+      if (!isDragging) return;
+
+      const delta = event.clientX - startX;
+      const newWidth = clamp(
+        startWidth + delta,
+        CONFIG.minPanelWidth,
+        CONFIG.maxPanelWidth
+      );
+
+      panel.style.width = `${newWidth}px`;
+    });
+
+    window.addEventListener("mouseup", function () {
+      if (!isDragging) return;
+
+      isDragging = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+
+      const finalWidth = Math.round(panel.getBoundingClientRect().width);
+      savePanelWidth(finalWidth);
+    });
+
+    resizerInitialized = true;
+  }
+
+  function applyPanelWidth(width) {
+    const panel = document.getElementById(CONFIG.panelId);
+    if (!panel) return;
+
+    const clamped = clamp(width, CONFIG.minPanelWidth, CONFIG.maxPanelWidth);
+    panel.style.width = `${clamped}px`;
+  }
+
+  function loadPanelWidth() {
+    try {
+      const raw = localStorage.getItem(CONFIG.panelWidthStorageKey);
+      const width = Number(raw);
+
+      if (!Number.isFinite(width)) {
+        return CONFIG.defaultPanelWidth;
+      }
+
+      return clamp(width, CONFIG.minPanelWidth, CONFIG.maxPanelWidth);
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to load panel width:", error);
+      return CONFIG.defaultPanelWidth;
+    }
+  }
+
+  function savePanelWidth(width) {
+    try {
+      const clamped = clamp(width, CONFIG.minPanelWidth, CONFIG.maxPanelWidth);
+      localStorage.setItem(CONFIG.panelWidthStorageKey, String(clamped));
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to save panel width:", error);
+    }
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
   }
 
   function isStaleTarget(target) {
