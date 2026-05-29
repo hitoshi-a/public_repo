@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.15
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.15 uses h2-only TOC and fixes markdown links.
+// @version      0.7.16
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.16 uses h2-only TOC, fixes markdown links, and truncates TOC labels.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -63,7 +63,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.15",
+    panelTitle: "TV Custom Panel v0.7.16",
     titlePollIntervalMs: 1000,
   };
 
@@ -619,6 +619,9 @@
         line-height: 1.35;
         padding: 5px 6px;
         box-sizing: border-box;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .tv-md-toc-item:hover {
@@ -1669,7 +1672,7 @@
     const items = currentHeadings
       .map(function (heading) {
         return [
-          `<button type="button" class="tv-md-toc-item level-${heading.level}" data-heading-id="${escapeHtml(heading.id)}">`,
+          `<button type="button" class="tv-md-toc-item level-${heading.level}" data-heading-id="${escapeHtml(heading.id)}" title="${escapeHtml(heading.text)}">`,
           escapeHtml(heading.text),
           "</button>",
         ].join("");
