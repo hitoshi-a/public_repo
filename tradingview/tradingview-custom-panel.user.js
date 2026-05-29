@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.14
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.12 linkify URLs and keep TOC click behavior.
+// @version      0.7.15
+// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.15 uses h2-only TOC and fixes markdown links.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -63,7 +63,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.12",
+    panelTitle: "TV Custom Panel v0.7.15",
     titlePollIntervalMs: 1000,
   };
 
@@ -1392,7 +1392,7 @@
         flushList();
 
         const level = headingMatch[1].length;
-        createHeading(level, headingMatch[2], level === 2 || level === 3);
+        createHeading(level, headingMatch[2], level === 2);
         i += 1;
         continue;
       }
@@ -1412,7 +1412,7 @@
         flushParagraph();
         flushList();
 
-        createHeading(3, subBlockHeadingMatch[1], true);
+        createHeading(3, subBlockHeadingMatch[1], false);
         i += 1;
         continue;
       }
