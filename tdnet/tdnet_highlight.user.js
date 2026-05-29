@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.4
+// @version      0.1.3
 // @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
+// @grant        GM_setClipboard
 // @connect      raw.githubusercontent.com
 // @updateURL    https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/tdnet_highlight.user.js
 // @downloadURL  https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/tdnet_highlight.user.js
@@ -17,6 +18,8 @@
   // 設定
   // ============================================================
 
+  const SCRIPT_VERSION = "0.1.3";
+
   const UNIVERSE_URL =
     "https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/universe_public.json";
 
@@ -24,13 +27,11 @@
     processedAttr: "data-tdnet-universe-highlighted",
     badgeClass: "tdnet-universe-badge",
     cellClass: "tdnet-universe-cell",
+    analyzeButtonClass: "tdnet-analyze-button",
 
     // GitHub rawのキャッシュが気になる場合は true。
     // 通常は false でよい。
-    useCacheBuster: false,
-
-    // 未登録・unknownは確認対象なので、少し目立たせる。
-    highlightUnknown: true
+    useCacheBuster: false
   };
 
   const STATUS_STYLE = {
@@ -42,10 +43,10 @@
       label: "OK"
     },
     caution: {
-      rowBackground: "#fef9c3",
+      rowBackground: "#fde68a",
       rowOpacity: "",
-      badgeBackground: "#fde68a",
-      badgeColor: "#78350f",
+      badgeBackground: "#f59e0b",
+      badgeColor: "#111827",
       label: "注意"
     },
     ng: {
@@ -56,17 +57,17 @@
       label: "NG"
     },
     unknown: {
-      rowBackground: "#ffe4e6",
+      rowBackground: "#fecdd3",
       rowOpacity: "",
-      badgeBackground: "#fecdd3",
-      badgeColor: "#881337",
+      badgeBackground: "#fb7185",
+      badgeColor: "#ffffff",
       label: "要確認"
     },
     missing: {
       rowBackground: "#d1d5db",
       rowOpacity: "0.15",
       badgeBackground: "#9ca3af",
-      badgeColor: "#881337",
+      badgeColor: "#111827",
       label: "東証外"
     }
   };
@@ -145,6 +146,26 @@
         padding-left: 6px;
         padding-right: 6px;
       }
+
+      .${CONFIG.analyzeButtonClass} {
+        display: inline-block;
+        margin-left: 4px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.4;
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        background: #e0f2fe;
+        color: #075985;
+        cursor: pointer;
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+
+      .${CONFIG.analyzeButtonClass}:hover {
+        background: #bae6fd;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -161,7 +182,7 @@
   function ensureBadgeContainer(row) {
     const cells = Array.from(row.querySelectorAll("td"));
 
-    // TDnet縺ｮ騾壼ｸｸ陦ｨ: 譎ょ綾 / 繧ｳ繝ｼ繝・/ 莨夂､ｾ蜷・/ 陦ｨ鬘・...
+    // TDnetの通常表: 時刻 / コード / 会社名 / 表題 ...
     const targetCell = cells[2] || cells[3] || null;
     if (!targetCell) return null;
 
@@ -188,10 +209,15 @@
     });
   }
 
+  function normalizeCode(code) {
+    if (!code) return "";
+    return String(code).trim().toUpperCase();
+  }
+
   function extractCodeFromRow(row) {
     const cells = Array.from(row.querySelectorAll("td"));
 
-// TDnetの通常表: 時刻 / コード / 会社名 / 表題 ...
+    // TDnetの通常表: 時刻 / コード / 会社名 / 表題 ...
     if (cells.length < 3) return null;
 
     const raw = (cells[1].textContent || "").trim().toUpperCase();
@@ -199,14 +225,15 @@
     // TDnetでは 68570 のように5桁表示されることがある。
     // 末尾0を除いた先頭4文字を通常の証券コードとして扱う。
     const m5 = raw.match(/^([0-9]{3}[0-9A-Z])0$/);
-    if (m5) return m5[1];
+    if (m5) return normalizeCode(m5[1]);
 
     // 念のため、4文字コードにも対応する。
     const m4 = raw.match(/^([0-9]{3}[0-9A-Z])$/);
-    if (m4) return m4[1];
+    if (m4) return normalizeCode(m4[1]);
 
     return null;
   }
+
   function containsAny(text, keywords) {
     return keywords.some((kw) => text.includes(kw));
   }
@@ -237,7 +264,7 @@
     if (!info) {
       return [
         `${code}`,
-        "universe_public.jsonに未登録",
+        "JPX東証マスターに存在しないため、東証外または対象外候補として扱う",
         `JSON生成日時: ${formatNullable(universe.generated_at)}`
       ].join("\n");
     }
@@ -289,7 +316,85 @@
     }
   }
 
-  function addBadges(row, info, status) {
+  function buildAnalyzePrompt(code) {
+    return `# 決算分析　対象：${code}
+
+Codex Skill「earnings-signal-analysis」を使用してください。
+SKILL.md本文を直接読んで実行してください。
+frontmatter、summary、generated yaml、default_prompt、過去の記憶だけで実行しないでください。
+
+出力は、このCodex workspace内の以下の相対パスに保存してください。
+earnings-signal-analysis/md/${code}.md
+
+SKILL.md本文はUTF-8として扱ってください。
+もしmdファイルの日本語が文字化けしているように見える場合は、分析を続行せず、どのファイル・どの読み取りコマンドで文字化けしたかだけ報告してください。
+
+文字化け対策やEncoding Guardをskill本文に追加しないでください。
+今回は分析結果mdの作成のみを行い、skillファイルや設定ファイルは編集しないでください。`;
+  }
+
+  async function copyTextToClipboard(text) {
+    if (typeof GM_setClipboard === "function") {
+      GM_setClipboard(text, "text");
+      return;
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    try {
+      const ok = document.execCommand("copy");
+      if (!ok) {
+        throw new Error("document.execCommand('copy') returned false");
+      }
+    } finally {
+      document.body.removeChild(textarea);
+    }
+  }
+
+  function addAnalyzeButton(container, code) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Analyze";
+    button.className = CONFIG.analyzeButtonClass;
+    button.title = "Codex用の決算兆候分析プロンプトをコピー";
+
+    button.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const prompt = buildAnalyzePrompt(code);
+
+      try {
+        await copyTextToClipboard(prompt);
+        button.textContent = "Copied";
+        setTimeout(() => {
+          button.textContent = "Analyze";
+        }, 1200);
+      } catch (err) {
+        console.error("[TDnet Highlighter] copy failed:", err);
+        button.textContent = "Failed";
+        setTimeout(() => {
+          button.textContent = "Analyze";
+        }, 1500);
+      }
+    });
+
+    container.appendChild(button);
+  }
+
+  function addBadges(row, code, info, status) {
     const cell = ensureBadgeContainer(row);
     if (!cell) return;
 
@@ -309,6 +414,9 @@
         makeBadge(sector, "#f3f4f6", "#374151")
       );
     }
+
+    // 全行にAnalyzeボタンを表示する。
+    addAnalyzeButton(cell, code);
   }
 
   function highlightRows(universe) {
@@ -329,7 +437,7 @@
       const status = getUniverseStatus(info);
 
       applyRowStyle(row, status);
-      addBadges(row, info, status);
+      addBadges(row, code, info, status);
 
       row.title = buildTooltip(code, info, universe, rowText);
 
@@ -376,6 +484,8 @@
 
   async function main() {
     injectStyle();
+
+    console.log(`[TDnet Highlighter] script version ${SCRIPT_VERSION} loaded`);
 
     try {
       const universe = await fetchJson(UNIVERSE_URL);
