@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.13
+// @version      0.7.14
 // @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.12 linkify URLs and keep TOC click behavior.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
@@ -1546,7 +1546,7 @@
 
     escaped = escaped.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 
-    return escaped.replace(/\\uE000(\d+)\\uE001/g, function (_match, index) {
+    return escaped.replace(/\uE000(\d+)\uE001/g, function (_match, index) {
       return placeholders[Number(index)] || "";
     });
   }
