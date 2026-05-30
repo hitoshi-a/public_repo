@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.18
-// @description  Show local earnings markdown or fallback company summary in a floating TradingView panel. v0.7.18 hides normal company summary status rows.
+// @version      0.7.19
+// @description  Show local earnings markdown or fallback company summary in a floating TradingView panel. v0.7.19 allows selecting text in panel body.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -64,7 +64,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.18",
+    panelTitle: "TV Custom Panel v0.7.19",
     titlePollIntervalMs: 1000,
   };
 
@@ -227,6 +227,19 @@
         padding: 12px;
         box-sizing: border-box;
         color: #ddd;
+        user-select: text;
+        -webkit-user-select: text;
+      }
+
+      #${CONFIG.bodyId} p,
+      #${CONFIG.bodyId} table,
+      #${CONFIG.bodyId} th,
+      #${CONFIG.bodyId} td,
+      #${CONFIG.bodyId} li,
+      #${CONFIG.bodyId} pre,
+      #${CONFIG.bodyId} code {
+        user-select: text;
+        -webkit-user-select: text;
       }
 
       #${CONFIG.bodyId}.tv-md-loading {
