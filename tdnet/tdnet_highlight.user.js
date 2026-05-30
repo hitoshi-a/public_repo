@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.18
+// @version      0.1.19
 // @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
@@ -18,7 +18,7 @@
   // 設定
   // ============================================================
 
-  const SCRIPT_VERSION = "0.1.18";
+  const SCRIPT_VERSION = "0.1.19";
 
   const UNIVERSE_URL =
     "https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/universe_public.json";
@@ -27,6 +27,10 @@
     processedAttr: "data-tdnet-universe-highlighted",
     badgeClass: "tdnet-universe-badge",
     cellClass: "tdnet-universe-cell",
+    statusSlotClass: "tdnet-universe-status-slot",
+    sectorSlotClass: "tdnet-universe-sector-slot",
+    analyzeSlotClass: "tdnet-universe-analyze-slot",
+    emptySlotClass: "tdnet-universe-empty-slot",
     analyzeButtonClass: "tdnet-analyze-button",
     summaryPanelClass: "tdnet-universe-summary-panel",
     summaryPanelId: "tdnet-universe-summary-panel",
@@ -131,7 +135,8 @@
     style.textContent = `
       .${CONFIG.badgeClass} {
         display: inline-block;
-        margin-left: 4px;
+        box-sizing: border-box;
+        max-width: 100%;
         padding: 1px 6px;
         border-radius: 999px;
         font-size: 11px;
@@ -139,19 +144,68 @@
         line-height: 1.4;
         border: 1px solid rgba(0, 0, 0, 0.08);
         white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
         vertical-align: middle;
       }
 
       .${CONFIG.cellClass} {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        width: 220px;
+        min-width: 220px;
+        max-width: 220px;
         white-space: nowrap;
         font-size: 12px;
         padding-left: 6px;
         padding-right: 6px;
+        box-sizing: border-box;
+        vertical-align: middle;
+      }
+
+      .${CONFIG.statusSlotClass} {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+        width: 44px;
+        min-width: 44px;
+        max-width: 44px;
+        overflow: hidden;
+      }
+
+      .${CONFIG.sectorSlotClass} {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+        width: 94px;
+        min-width: 94px;
+        max-width: 94px;
+        overflow: hidden;
+      }
+
+      .${CONFIG.analyzeSlotClass} {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-start;
+        width: 62px;
+        min-width: 62px;
+        max-width: 62px;
+        overflow: hidden;
+      }
+
+      .${CONFIG.emptySlotClass} {
+        display: inline-block;
+        width: 100%;
+        height: 1px;
       }
 
       .${CONFIG.analyzeButtonClass} {
         display: inline-block;
-        margin-left: 4px;
+        box-sizing: border-box;
+        width: 58px;
+        min-width: 58px;
+        max-width: 58px;
         padding: 1px 6px;
         border-radius: 999px;
         font-size: 11px;
@@ -161,6 +215,7 @@
         background: #e0f2fe;
         color: #075985;
         cursor: pointer;
+        text-align: center;
         vertical-align: middle;
         white-space: nowrap;
       }
@@ -226,8 +281,6 @@
 
     container = document.createElement("span");
     container.className = CONFIG.cellClass;
-    container.style.marginLeft = "6px";
-    container.style.whiteSpace = "nowrap";
 
     targetCell.appendChild(container);
     return container;
@@ -506,6 +559,12 @@ SKILL.md本文はUTF-8として扱ってください。
     }
   }
 
+  function makeEmptySlot() {
+    const span = document.createElement("span");
+    span.className = CONFIG.emptySlotClass;
+    return span;
+  }
+
   function addAnalyzeButton(container, code) {
     const button = document.createElement("button");
     button.type = "button";
@@ -542,24 +601,39 @@ SKILL.md本文はUTF-8として扱ってください。
     if (!cell) return;
 
     const style = STATUS_STYLE[status] || STATUS_STYLE.unknown;
+    const sector = getDisplaySector(info);
 
-    // 状態バッジ
+    // 行ごとのリンク座標が揺れないよう、全行で同じ幅の3スロットを必ず確保する。
+    // [状態 44px] [業種 94px] [Analyze 62px] + gap/padding = cell幅 220px。
+    const statusSlot = document.createElement("span");
+    statusSlot.className = CONFIG.statusSlotClass;
+
     if (status !== "ok") {
-      cell.appendChild(
+      statusSlot.appendChild(
         makeBadge(style.label, style.badgeBackground, style.badgeColor)
       );
+    } else {
+      statusSlot.appendChild(makeEmptySlot());
     }
 
-    // 業種バッジ
-    const sector = getDisplaySector(info);
+    const sectorSlot = document.createElement("span");
+    sectorSlot.className = CONFIG.sectorSlotClass;
+
     if (sector) {
-      cell.appendChild(
+      sectorSlot.appendChild(
         makeBadge(sector, "#f3f4f6", "#374151")
       );
+    } else {
+      sectorSlot.appendChild(makeEmptySlot());
     }
 
-    // 全行にAnalyzeボタンを表示する。
-    addAnalyzeButton(cell, code);
+    const analyzeSlot = document.createElement("span");
+    analyzeSlot.className = CONFIG.analyzeSlotClass;
+    addAnalyzeButton(analyzeSlot, code);
+
+    cell.appendChild(statusSlot);
+    cell.appendChild(sectorSlot);
+    cell.appendChild(analyzeSlot);
   }
 
   function highlightRows(universe) {
