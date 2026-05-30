@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.17
-// @description  Show local earnings markdown or fallback company summary in a floating TradingView panel. v0.7.17 adds company summary fallback.
+// @version      0.7.18
+// @description  Show local earnings markdown or fallback company summary in a floating TradingView panel. v0.7.18 hides normal company summary status rows.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -64,7 +64,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.17",
+    panelTitle: "TV Custom Panel v0.7.18",
     titlePollIntervalMs: 1000,
   };
 
@@ -1386,7 +1386,6 @@
 
     addSummaryRow(rows, "Source", profile.source);
     addSummaryRow(rows, "Updated", profile.updated_at);
-    addSummaryRow(rows, "Status", profile.status);
 
     const lines = [];
     lines.push(`# ${ticker}${displayName ? " " + displayName : ""}`);
