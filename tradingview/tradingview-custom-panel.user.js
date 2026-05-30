@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.16
-// @description  Show a local markdown file in a floating custom panel on TradingView. v0.7.16 uses h2-only TOC, fixes markdown links, and truncates TOC labels.
+// @version      0.7.17
+// @description  Show local earnings markdown or fallback company summary in a floating TradingView panel. v0.7.17 adds company summary fallback.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -20,6 +20,7 @@
 
   const CONFIG = {
     markdownBaseUrl: "http://127.0.0.1:8765/earnings-signal-analysis/md",
+    companySummaryUrl: "http://127.0.0.1:8765/company-summary/company_summary.json",
 
     panelId: "tv-md-panel",
     headerId: "tv-md-panel-header",
@@ -63,7 +64,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.16",
+    panelTitle: "TV Custom Panel v0.7.17",
     titlePollIntervalMs: 1000,
   };
 
@@ -77,6 +78,8 @@
   let currentRenderMode = CONFIG.defaultRenderMode;
   let currentPanelOpacity = CONFIG.defaultPanelOpacity;
   let currentHeadings = [];
+  let companySummaryCache = null;
+  let companySummaryLoadPromise = null;
 
   function init() {
     if (!document.body) {
@@ -650,10 +653,11 @@
     refreshButton.id = CONFIG.refreshButtonId;
     refreshButton.type = "button";
     refreshButton.className = "tv-md-settings-action";
-    refreshButton.title = "Reload current ticker markdown";
-    refreshButton.textContent = "Reload MD";
+    refreshButton.title = "Reload current ticker markdown or company summary";
+    refreshButton.textContent = "Reload";
     refreshButton.addEventListener("click", function () {
       setUserHidden(false);
+      clearCompanySummaryCache();
       loadCurrentTickerMarkdown({
         forceReload: true,
         showErrorPanel: true,
@@ -979,7 +983,7 @@
 
     if (showErrorPanel) {
       showPanel();
-      title.textContent = `${CONFIG.panelTitle} / ${target.filename} / loading`;
+      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / loading`;
       setBodyText(
         [
           "Markdownを取得しています。",
@@ -1116,40 +1120,19 @@
 
     if (status >= 200 && status < 300) {
       showPanel();
-      showMarkdown(response.responseText || "", target, status);
+      showMarkdown(response.responseText || "", target);
+      return;
+    }
+
+    if (status === 404) {
+      showCompanySummaryFallback(target, {
+        showErrorPanel: showErrorPanel,
+      });
       return;
     }
 
     if (!showErrorPanel) {
       hidePanel();
-      return;
-    }
-
-    if (status === 404) {
-      showError(
-        [
-          "mdファイルが見つかりません。",
-          "",
-          "HTTP Status:",
-          `${status} ${statusText}`,
-          "",
-          "Ticker:",
-          target.ticker,
-          "",
-          "Expected file:",
-          target.filename,
-          "",
-          "URL:",
-          target.url,
-          "",
-          "確認点:",
-          "- mdファイルを作成したか",
-          "- ファイル名が一致しているか",
-          "- ローカルサーバーのルート直下に md フォルダがあるか",
-          "- 起動ディレクトリが正しいか",
-        ].join("\n"),
-        target
-      );
       return;
     }
 
@@ -1202,11 +1185,278 @@
     );
   }
 
-  function showMarkdown(markdown, target, status) {
+  function clearCompanySummaryCache() {
+    companySummaryCache = null;
+    companySummaryLoadPromise = null;
+  }
+
+  function loadCompanySummaryJson() {
+    if (companySummaryCache) {
+      return Promise.resolve(companySummaryCache);
+    }
+
+    if (companySummaryLoadPromise) {
+      return companySummaryLoadPromise;
+    }
+
+    if (typeof GM_xmlhttpRequest !== "function") {
+      return Promise.reject(new Error("GM_xmlhttpRequest is not available"));
+    }
+
+    const requestUrl = withCacheBuster(CONFIG.companySummaryUrl);
+
+    companySummaryLoadPromise = new Promise(function (resolve, reject) {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: requestUrl,
+        timeout: 20000,
+
+        onload: function (response) {
+          try {
+            if (response.status < 200 || response.status >= 300) {
+              reject(
+                new Error(
+                  `company_summary.json HTTP ${response.status}: ${String(response.responseText || "").slice(0, 200)}`
+                )
+              );
+              return;
+            }
+
+            const parsed = JSON.parse(response.responseText || "{}");
+            companySummaryCache = parsed;
+            resolve(parsed);
+          } catch (error) {
+            reject(error);
+          }
+        },
+
+        onerror: function (error) {
+          reject(error);
+        },
+
+        ontimeout: function () {
+          reject(new Error("company_summary.json request timed out"));
+        },
+      });
+    }).catch(function (error) {
+      companySummaryLoadPromise = null;
+      throw error;
+    });
+
+    return companySummaryLoadPromise;
+  }
+
+  function showCompanySummaryFallback(target, options) {
+    const showErrorPanel = Boolean(options && options.showErrorPanel);
+    const title = document.getElementById(CONFIG.titleId);
+
+    showPanel();
+
+    if (title) {
+      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / company summary loading`;
+    }
+
+    if (showErrorPanel) {
+      setBodyText(
+        [
+          "mdファイルが見つからないため、簡易会社概要を取得しています。",
+          "",
+          "Ticker:",
+          target.ticker,
+          "",
+          "Company summary URL:",
+          CONFIG.companySummaryUrl,
+        ].join("\n"),
+        "tv-md-loading"
+      );
+    }
+
+    loadCompanySummaryJson()
+      .then(function (data) {
+        if (isStaleTarget(target)) return;
+        if (userHidden) return;
+
+        const profile = findCompanyProfile(data, target.ticker);
+        if (profile) {
+          showCompanySummary(profile, target);
+        } else {
+          showNoCompanySummary(target);
+        }
+      })
+      .catch(function (error) {
+        if (isStaleTarget(target)) return;
+        if (userHidden) return;
+
+        showError(
+          [
+            "mdファイルが見つからず、company_summary.json の取得にも失敗しました。",
+            "",
+            "Ticker:",
+            target.ticker,
+            "",
+            "Expected md:",
+            target.filename,
+            "",
+            "Company summary URL:",
+            CONFIG.companySummaryUrl,
+            "",
+            "確認点:",
+            "- company_summary.json を生成したか",
+            "- ローカルサーバーのルートが public_repo になっているか",
+            "- http://127.0.0.1:8765/company-summary/company_summary.json をブラウザで開けるか",
+            "",
+            "Error:",
+            String(error && error.message ? error.message : error),
+          ].join("\n"),
+          target
+        );
+      });
+  }
+
+  function findCompanyProfile(data, ticker) {
+    const symbols = data && data.symbols ? data.symbols : null;
+    if (!symbols) return null;
+
+    const key = String(ticker || "").trim().toUpperCase();
+    if (!key) return null;
+
+    return symbols[key] || symbols[key.replace(/\./g, "-")] || null;
+  }
+
+  function showCompanySummary(profile, target) {
     const title = document.getElementById(CONFIG.titleId);
 
     if (title) {
-      title.textContent = `${CONFIG.panelTitle} / ${target.filename} / loaded ${status}`;
+      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / company summary`;
+    }
+
+    const markdown = buildCompanySummaryMarkdown(profile, target);
+    currentMarkdownText = markdown;
+    renderMarkdownContent(markdown);
+  }
+
+  function showNoCompanySummary(target) {
+    const title = document.getElementById(CONFIG.titleId);
+
+    if (title) {
+      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / no data`;
+    }
+
+    currentMarkdownText = "";
+    currentHeadings = [];
+    updateTocMenu();
+
+    setBodyText(
+      [
+        "mdファイルが見つからず、会社概要データにも該当tickerがありません。",
+        "",
+        "Ticker:",
+        target.ticker,
+        "",
+        "Expected md:",
+        target.filename,
+        "",
+        "Company summary URL:",
+        CONFIG.companySummaryUrl,
+      ].join("\n"),
+      "tv-md-error"
+    );
+  }
+
+  function buildCompanySummaryMarkdown(profile, target) {
+    const ticker = String(profile.ticker || target.ticker || "").trim().toUpperCase();
+    const country = String(profile.country || "").trim();
+    const displayName = buildCompanyDisplayName(profile);
+    const rows = [];
+
+    addSummaryRow(rows, "会社名", displayName);
+    addSummaryRow(rows, "Exchange", profile.exchange);
+    addSummaryRow(rows, "市場", profile.market);
+    addSummaryRow(rows, "国", profile.country);
+    addSummaryRow(rows, "Industry", profile.industry);
+    addSummaryRow(rows, "Sector", profile.sector);
+
+    if (country === "Japan") {
+      addSummaryRow(rows, "JPX 33業種", profile.sector33);
+    }
+
+    if (profile.website) {
+      addSummaryRow(rows, "Website", `[${profile.website}](${profile.website})`);
+    }
+
+    addSummaryRow(rows, "Source", profile.source);
+    addSummaryRow(rows, "Updated", profile.updated_at);
+    addSummaryRow(rows, "Status", profile.status);
+
+    const lines = [];
+    lines.push(`# ${ticker}${displayName ? " " + displayName : ""}`);
+    lines.push("");
+    lines.push("簡易会社概要");
+    lines.push("");
+
+    if (rows.length > 0) {
+      lines.push("| 項目 | 内容 |");
+      lines.push("|---|---|");
+      rows.forEach(function (row) {
+        lines.push(`| ${escapeMarkdownTableCell(row.label)} | ${escapeMarkdownTableCell(row.value)} |`);
+      });
+      lines.push("");
+    }
+
+    const summary = String(profile.business_summary || "").trim();
+    if (summary) {
+      lines.push(summary);
+    } else {
+      lines.push("**会社概要データ未取得：business_summary が空です。**");
+      if (profile.status) {
+        lines.push("");
+        lines.push(`status: ${profile.status}`);
+      }
+      if (profile.error) {
+        lines.push("");
+        lines.push(`error: ${profile.error}`);
+      }
+    }
+
+    return lines.join("\n");
+  }
+
+  function buildCompanyDisplayName(profile) {
+    const country = String(profile && profile.country ? profile.country : "").trim();
+    const name = String(profile && profile.name ? profile.name : "").trim();
+    const universeName = String(profile && profile.name_from_universe ? profile.name_from_universe : "").trim();
+
+    if (country === "Japan") {
+      if (universeName && name && universeName !== name) {
+        return `${universeName} / ${name}`;
+      }
+      return universeName || name;
+    }
+
+    return name || universeName;
+  }
+
+  function addSummaryRow(rows, label, value) {
+    const text = String(value === null || value === undefined ? "" : value).trim();
+    if (!text) return;
+
+    rows.push({
+      label: label,
+      value: text,
+    });
+  }
+
+  function escapeMarkdownTableCell(value) {
+    return String(value || "")
+      .replace(/\r?\n/g, " ")
+      .replace(/\|/g, "&#124;");
+  }
+
+  function showMarkdown(markdown, target) {
+    const title = document.getElementById(CONFIG.titleId);
+
+    if (title) {
+      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / earnings signal`;
     }
 
     currentMarkdownText = String(markdown || "");
@@ -1750,8 +2000,8 @@
     showPanel();
 
     if (title) {
-      if (target && target.filename) {
-        title.textContent = `${CONFIG.panelTitle} / ${target.filename} / error`;
+      if (target && target.ticker) {
+        title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / error`;
       } else {
         title.textContent = `${CONFIG.panelTitle} / error`;
       }
