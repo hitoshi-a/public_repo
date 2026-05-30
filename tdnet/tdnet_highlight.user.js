@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.15
+// @version      0.1.16
 // @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
@@ -18,7 +18,7 @@
   // 設定
   // ============================================================
 
-  const SCRIPT_VERSION = "0.1.3";
+  const SCRIPT_VERSION = "0.1.16";
 
   const UNIVERSE_URL =
     "https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/universe_public.json";
@@ -28,6 +28,7 @@
     badgeClass: "tdnet-universe-badge",
     cellClass: "tdnet-universe-cell",
     analyzeButtonClass: "tdnet-analyze-button",
+    summaryPanelClass: "tdnet-universe-summary-panel",
 
     // GitHub rawのキャッシュが気になる場合は true。
     // 通常は false でよい。
@@ -166,6 +167,39 @@
       .${CONFIG.analyzeButtonClass}:hover {
         background: #bae6fd;
       }
+
+      .${CONFIG.summaryPanelClass} {
+        position: fixed;
+        right: 12px;
+        top: 12px;
+        z-index: 999999;
+        max-width: 460px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        background: rgba(255, 255, 255, 0.94);
+        color: #111827;
+        font-size: 12px;
+        line-height: 1.5;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        pointer-events: none;
+      }
+
+      .${CONFIG.summaryPanelClass} .title {
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+
+      .${CONFIG.summaryPanelClass} .counts {
+        white-space: nowrap;
+      }
+
+      .${CONFIG.summaryPanelClass} .meta {
+        color: #6b7280;
+        font-size: 11px;
+        white-space: nowrap;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -241,6 +275,92 @@
   function formatNullable(value, fallback = "不明") {
     if (value === null || value === undefined || value === "") return fallback;
     return String(value);
+  }
+
+  function formatCount(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "0";
+    return Math.round(n).toLocaleString("en-US");
+  }
+
+  function getUniverseCounts(universe) {
+    const counts = {
+      ok: 0,
+      caution: 0,
+      unknown: 0,
+      ng: 0,
+      total: 0
+    };
+
+    const summaryCounts = universe &&
+      universe.summary &&
+      universe.summary.universe_counts
+      ? universe.summary.universe_counts
+      : null;
+
+    if (summaryCounts) {
+      counts.ok = Number(summaryCounts.ok || 0);
+      counts.caution = Number(summaryCounts.caution || 0);
+      counts.unknown = Number(summaryCounts.unknown || 0);
+      counts.ng = Number(summaryCounts.ng || 0);
+      counts.total = Number(
+        universe.summary && universe.summary.total !== undefined
+          ? universe.summary.total
+          : counts.ok + counts.caution + counts.unknown + counts.ng
+      );
+      return counts;
+    }
+
+    const symbols = universe && universe.symbols ? universe.symbols : {};
+
+    Object.values(symbols).forEach((info) => {
+      const status = getUniverseStatus(info);
+
+      if (status === "ok") counts.ok += 1;
+      else if (status === "caution") counts.caution += 1;
+      else if (status === "ng") counts.ng += 1;
+      else counts.unknown += 1;
+
+      counts.total += 1;
+    });
+
+    return counts;
+  }
+
+  function showUniverseSummary(universe) {
+    const existing = document.querySelector(`.${CONFIG.summaryPanelClass}`);
+    if (existing) {
+      existing.remove();
+    }
+
+    const counts = getUniverseCounts(universe);
+    const generatedAt = formatNullable(universe && universe.generated_at);
+
+    const panel = document.createElement("div");
+    panel.className = CONFIG.summaryPanelClass;
+
+    const title = document.createElement("div");
+    title.className = "title";
+    title.textContent = "TDnet Universe";
+
+    const countsLine = document.createElement("div");
+    countsLine.className = "counts";
+    countsLine.textContent = [
+      `OK ${formatCount(counts.ok)}`,
+      `Caution ${formatCount(counts.caution)}`,
+      `Unknown ${formatCount(counts.unknown)}`,
+      `NG ${formatCount(counts.ng)}`,
+      `Total ${formatCount(counts.total)}`
+    ].join(" / ");
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = `Generated: ${generatedAt}`;
+
+    panel.appendChild(title);
+    panel.appendChild(countsLine);
+    panel.appendChild(meta);
+    document.body.appendChild(panel);
   }
 
   function getDisplaySector(info) {
@@ -496,6 +616,7 @@ SKILL.md本文はUTF-8として扱ってください。
         universe.summary || {}
       );
 
+      showUniverseSummary(universe);
       highlightRows(universe);
       observePage(universe);
     } catch (e) {
