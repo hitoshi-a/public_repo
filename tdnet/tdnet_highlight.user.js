@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.17
+// @version      0.1.18
 // @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
@@ -18,7 +18,7 @@
   // 設定
   // ============================================================
 
-  const SCRIPT_VERSION = "0.1.17";
+  const SCRIPT_VERSION = "0.1.18";
 
   const UNIVERSE_URL =
     "https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/universe_public.json";
@@ -337,11 +337,10 @@
   }
 
   function shouldShowUniverseSummary() {
-    // TDnetは複数frameで構成されることがあり、userscriptが各frameで実行される。
-    // 一覧frameにSummaryを出すと二重表示になるため、実際の開示行を持つframeでは表示しない。
-    // 単一document構成に変わった場合は、top windowで従来通り表示する。
-    const hasDisclosureRows = findCandidateRows().some((row) => Boolean(extractCodeFromRow(row)));
-    return !(isInFrame() && hasDisclosureRows);
+    // TDnetは複数frame構成で、開示がない日には一覧frameにも実データ行がないため、
+    // 「開示行の有無」で判定するとSummaryが二重表示される。
+    // Summaryは画面全体に1つあればよいので、top windowでのみ表示する。
+    return !isInFrame();
   }
 
   function removeUniverseSummaryPanels() {
