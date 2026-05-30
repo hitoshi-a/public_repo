@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.16
+// @version      0.1.17
 // @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
@@ -18,7 +18,7 @@
   // 設定
   // ============================================================
 
-  const SCRIPT_VERSION = "0.1.16";
+  const SCRIPT_VERSION = "0.1.17";
 
   const UNIVERSE_URL =
     "https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/universe_public.json";
@@ -29,6 +29,7 @@
     cellClass: "tdnet-universe-cell",
     analyzeButtonClass: "tdnet-analyze-button",
     summaryPanelClass: "tdnet-universe-summary-panel",
+    summaryPanelId: "tdnet-universe-summary-panel",
 
     // GitHub rawのキャッシュが気になる場合は true。
     // 通常は false でよい。
@@ -327,16 +328,39 @@
     return counts;
   }
 
+  function isInFrame() {
+    try {
+      return window.self !== window.top;
+    } catch (_e) {
+      return true;
+    }
+  }
+
+  function shouldShowUniverseSummary() {
+    // TDnetは複数frameで構成されることがあり、userscriptが各frameで実行される。
+    // 一覧frameにSummaryを出すと二重表示になるため、実際の開示行を持つframeでは表示しない。
+    // 単一document構成に変わった場合は、top windowで従来通り表示する。
+    const hasDisclosureRows = findCandidateRows().some((row) => Boolean(extractCodeFromRow(row)));
+    return !(isInFrame() && hasDisclosureRows);
+  }
+
+  function removeUniverseSummaryPanels() {
+    const selector = `#${CONFIG.summaryPanelId}, .${CONFIG.summaryPanelClass}`;
+    Array.from(document.querySelectorAll(selector)).forEach((el) => el.remove());
+  }
+
   function showUniverseSummary(universe) {
-    const existing = document.querySelector(`.${CONFIG.summaryPanelClass}`);
-    if (existing) {
-      existing.remove();
+    removeUniverseSummaryPanels();
+
+    if (!shouldShowUniverseSummary()) {
+      return;
     }
 
     const counts = getUniverseCounts(universe);
     const generatedAt = formatNullable(universe && universe.generated_at);
 
     const panel = document.createElement("div");
+    panel.id = CONFIG.summaryPanelId;
     panel.className = CONFIG.summaryPanelClass;
 
     const title = document.createElement("div");
