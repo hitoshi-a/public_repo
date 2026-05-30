@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.19
-// @description  Show local earnings markdown or fallback company summary in a floating TradingView panel. v0.7.19 allows selecting text in panel body.
+// @version      0.7.20
+// @description  Show local earnings markdown or fallback company summary in a floating TradingView panel. v0.7.20 simplifies Japanese company display names.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -64,7 +64,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.19",
+    panelTitle: "TV Custom Panel v0.7.20",
     titlePollIntervalMs: 1000,
   };
 
@@ -1439,9 +1439,6 @@
     const universeName = String(profile && profile.name_from_universe ? profile.name_from_universe : "").trim();
 
     if (country === "Japan") {
-      if (universeName && name && universeName !== name) {
-        return `${universeName} / ${name}`;
-      }
       return universeName || name;
     }
 
