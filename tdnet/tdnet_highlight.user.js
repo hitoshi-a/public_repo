@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.20
+// @version      0.1.21
 // @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
@@ -18,7 +18,7 @@
   // 設定
   // ============================================================
 
-  const SCRIPT_VERSION = "0.1.20";
+  const SCRIPT_VERSION = "0.1.21";
 
   const UNIVERSE_URL =
     "https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/universe_public.json";
@@ -34,6 +34,9 @@
     analyzeButtonClass: "tdnet-analyze-button",
     summaryPanelClass: "tdnet-universe-summary-panel",
     summaryPanelId: "tdnet-universe-summary-panel",
+
+    analyzeDelayMinutes: 10,
+    analyzeWaitUpdateIntervalMs: 30000,
 
     // GitHub rawのキャッシュが気になる場合は true。
     // 通常は false でよい。
@@ -222,6 +225,16 @@
 
       .${CONFIG.analyzeButtonClass}:hover {
         background: #bae6fd;
+      }
+
+      .${CONFIG.analyzeButtonClass}:disabled {
+        background: #e5e7eb;
+        color: #6b7280;
+        cursor: not-allowed;
+      }
+
+      .${CONFIG.analyzeButtonClass}:disabled:hover {
+        background: #e5e7eb;
       }
 
       .${CONFIG.summaryPanelClass} {
@@ -512,6 +525,153 @@
     }
   }
 
+  function extractDisclosureDateFromPage() {
+    const text = document.body ? document.body.textContent || "" : "";
+
+    // 第一候補: 一覧見出し「YYYY年MM月DD日 に開示された情報」
+    let match = text.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*に開示された情報/);
+    if (match) {
+      return {
+        year: Number(match[1]),
+        month: Number(match[2]),
+        day: Number(match[3])
+      };
+    }
+
+    // 第二候補: ページ上部の日付セレクタ等。
+    // 右上の「最終更新日時」は使わないため、body全体のゆるい日付検索は行わない。
+    const candidates = [];
+
+    Array.from(document.querySelectorAll("select option:checked, input, button, a, span, div"))
+      .slice(0, 300)
+      .forEach((el) => {
+        const value = el.value || el.textContent || "";
+        const candidateText = String(value).trim();
+        if (!candidateText || candidateText.includes("最終更新")) return;
+        candidates.push(candidateText);
+      });
+
+    for (const candidate of candidates) {
+      match = candidate.match(/^(\d{4})[\/年](\d{1,2})[\/月](\d{1,2})(?:日|\b)/);
+      if (match) {
+        return {
+          year: Number(match[1]),
+          month: Number(match[2]),
+          day: Number(match[3])
+        };
+      }
+    }
+
+    return null;
+  }
+
+  function extractDisclosureTimeFromRow(row) {
+    const cells = Array.from(row.querySelectorAll("td"));
+    if (cells.length < 1) return null;
+
+    const text = String(cells[0].textContent || "").trim();
+    const match = text.match(/(\d{1,2}):(\d{2})/);
+    if (!match) return null;
+
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+
+    if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+    return { hour, minute };
+  }
+
+  function buildDisclosureDateTime(row) {
+    const date = extractDisclosureDateFromPage();
+    const time = extractDisclosureTimeFromRow(row);
+
+    if (!date || !time) return null;
+
+    const disclosureDateTime = new Date(
+      date.year,
+      date.month - 1,
+      date.day,
+      time.hour,
+      time.minute,
+      0,
+      0
+    );
+
+    if (Number.isNaN(disclosureDateTime.getTime())) return null;
+
+    return disclosureDateTime;
+  }
+
+  function getAnalyzeReadyAt(row) {
+    const disclosureDateTime = buildDisclosureDateTime(row);
+    if (!disclosureDateTime) return null;
+
+    return new Date(
+      disclosureDateTime.getTime() + CONFIG.analyzeDelayMinutes * 60 * 1000
+    );
+  }
+
+  function getRemainingWaitMinutes(readyAt) {
+    const remainingMs = readyAt.getTime() - Date.now();
+    if (remainingMs <= 0) return 0;
+    return Math.max(1, Math.ceil(remainingMs / 60000));
+  }
+
+  function enableAnalyzeButton(button) {
+    button.disabled = false;
+    button.textContent = "Analyze";
+    button.title = "Codex用の決算兆候分析プロンプトをコピー";
+  }
+
+  function updateAnalyzeWaitButton(button, readyAt) {
+    const remainingMinutes = getRemainingWaitMinutes(readyAt);
+
+    if (remainingMinutes <= 0) {
+      enableAnalyzeButton(button);
+      return true;
+    }
+
+    button.disabled = true;
+    button.textContent = `Wait ${remainingMinutes}m`;
+    button.title = `開示から${CONFIG.analyzeDelayMinutes}分経過後にAnalyze可能`;
+    return false;
+  }
+
+  function applyAnalyzeDelayIfNeeded(button, row) {
+    const readyAt = getAnalyzeReadyAt(row);
+
+    // 日付・時刻を取れない場合は、従来通り即有効化する。
+    if (!readyAt) {
+      enableAnalyzeButton(button);
+      return;
+    }
+
+    if (readyAt.getTime() <= Date.now()) {
+      enableAnalyzeButton(button);
+      return;
+    }
+
+    const updateDone = updateAnalyzeWaitButton(button, readyAt);
+    if (updateDone) return;
+
+    const remainingMs = Math.max(0, readyAt.getTime() - Date.now());
+
+    const intervalId = window.setInterval(() => {
+      const done = updateAnalyzeWaitButton(button, readyAt);
+      if (done) {
+        window.clearInterval(intervalId);
+      }
+    }, CONFIG.analyzeWaitUpdateIntervalMs);
+
+    window.setTimeout(() => {
+      const done = updateAnalyzeWaitButton(button, readyAt);
+      if (done) {
+        window.clearInterval(intervalId);
+      }
+    }, remainingMs + 100);
+  }
+
   function buildAnalyzePrompt(code) {
     return `# 決算分析　対象：${code}
 
@@ -565,7 +725,7 @@ SKILL.md本文はUTF-8として扱ってください。
     return span;
   }
 
-  function addAnalyzeButton(container, code) {
+  function addAnalyzeButton(container, code, row) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = "Analyze";
@@ -576,24 +736,31 @@ SKILL.md本文はUTF-8として扱ってください。
       e.preventDefault();
       e.stopPropagation();
 
+      if (button.disabled) return;
+
       const prompt = buildAnalyzePrompt(code);
 
       try {
         await copyTextToClipboard(prompt);
         button.textContent = "Copied";
         setTimeout(() => {
-          button.textContent = "Analyze";
+          if (!button.disabled) {
+            button.textContent = "Analyze";
+          }
         }, 1200);
       } catch (err) {
         console.error("[TDnet Highlighter] copy failed:", err);
         button.textContent = "Failed";
         setTimeout(() => {
-          button.textContent = "Analyze";
+          if (!button.disabled) {
+            button.textContent = "Analyze";
+          }
         }, 1500);
       }
     });
 
     container.appendChild(button);
+    applyAnalyzeDelayIfNeeded(button, row);
   }
 
   function addBadges(row, code, info, status) {
@@ -618,7 +785,7 @@ SKILL.md本文はUTF-8として扱ってください。
       );
     }
 
-    addAnalyzeButton(cell, code);
+    addAnalyzeButton(cell, code, row);
   }
 
   function highlightRows(universe) {
