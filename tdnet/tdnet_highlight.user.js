@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.19
+// @version      0.1.20
 // @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
@@ -18,7 +18,7 @@
   // 設定
   // ============================================================
 
-  const SCRIPT_VERSION = "0.1.19";
+  const SCRIPT_VERSION = "0.1.20";
 
   const UNIVERSE_URL =
     "https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/universe_public.json";
@@ -603,37 +603,22 @@ SKILL.md本文はUTF-8として扱ってください。
     const style = STATUS_STYLE[status] || STATUS_STYLE.unknown;
     const sector = getDisplaySector(info);
 
-    // 行ごとのリンク座標が揺れないよう、全行で同じ幅の3スロットを必ず確保する。
-    // [状態 44px] [業種 94px] [Analyze 62px] + gap/padding = cell幅 220px。
-    const statusSlot = document.createElement("span");
-    statusSlot.className = CONFIG.statusSlotClass;
-
+    // cell自体の固定幅は維持し、内部要素だけを左詰めで並べる。
+    // これにより、右側リンク列の座標は全行で固定しつつ、
+    // OK行で状態バッジがない場合も業種バッジが左に寄る。
     if (status !== "ok") {
-      statusSlot.appendChild(
+      cell.appendChild(
         makeBadge(style.label, style.badgeBackground, style.badgeColor)
       );
-    } else {
-      statusSlot.appendChild(makeEmptySlot());
     }
-
-    const sectorSlot = document.createElement("span");
-    sectorSlot.className = CONFIG.sectorSlotClass;
 
     if (sector) {
-      sectorSlot.appendChild(
+      cell.appendChild(
         makeBadge(sector, "#f3f4f6", "#374151")
       );
-    } else {
-      sectorSlot.appendChild(makeEmptySlot());
     }
 
-    const analyzeSlot = document.createElement("span");
-    analyzeSlot.className = CONFIG.analyzeSlotClass;
-    addAnalyzeButton(analyzeSlot, code);
-
-    cell.appendChild(statusSlot);
-    cell.appendChild(sectorSlot);
-    cell.appendChild(analyzeSlot);
+    addAnalyzeButton(cell, code);
   }
 
   function highlightRows(universe) {
