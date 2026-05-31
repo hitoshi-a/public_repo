@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.22
-// @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする。v0.1.22: 集計パネルを一覧画面だけに表示
+// @version      0.1.23
+// @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする。v0.1.23: Analyzeプロンプトをcodex-workspace出力先に対応
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setClipboard
@@ -18,7 +18,7 @@
   // 設定
   // ============================================================
 
-  const SCRIPT_VERSION = "0.1.22";
+  const SCRIPT_VERSION = "0.1.23";
 
   const UNIVERSE_URL =
     "https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/universe_public.json";
@@ -758,7 +758,15 @@ SKILL.md本文を直接読んで実行してください。
 frontmatter、summary、generated yaml、default_prompt、過去の記憶だけで実行しないでください。
 
 出力は、このCodex workspace内の以下の相対パスに保存してください。
-earnings-signal-analysis/md/${code}.md
+investment-analysis/earnings-signal-analysis/md/${code}.md
+
+## 既存出力ファイルの扱い
+
+出力先mdファイルが既に存在する場合でも、既存ファイルの内容確認は不要です。
+既存mdは過去の生成物であり、今回の分析資料として扱わないでください。
+必要であれば、既存ファイルを確認せずに今回の分析結果で全文上書きしてください。
+
+前回決算との比較は、既存mdではなく、会社公式の前回決算資料・説明資料・transcript等を使ってください。
 
 SKILL.md本文はUTF-8として扱ってください。
 もしmdファイルの日本語が文字化けしているように見える場合は、分析を続行せず、どのファイル・どの読み取りコマンドで文字化けしたかだけ報告してください。
