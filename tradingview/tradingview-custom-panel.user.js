@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.22
-// @description  Show local signal/phase markdown or company summary in a floating TradingView panel. v0.7.22 moves closed-state buttons left and uses copy-like prompt icons.
+// @version      0.7.23
+// @description  Show local signal/phase markdown or company summary in a floating TradingView panel. v0.7.23 reorders closed-state floating buttons.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -73,7 +73,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.22",
+    panelTitle: "TV Custom Panel v0.7.23",
     titlePollIntervalMs: 1000,
   };
 
@@ -442,26 +442,26 @@
         display: block;
       }
 
-      #${CONFIG.floatingButtonId} {
+      #${CONFIG.floatingAnalyzeButtonId} {
         left: 12px;
+        min-width: 58px;
+        padding: 0 7px;
+      }
+
+      #${CONFIG.floatingPhaseAnalyzeButtonId} {
+        left: 78px;
+        min-width: 58px;
+        padding: 0 7px;
+      }
+
+      #${CONFIG.floatingButtonId} {
+        left: 144px;
         width: 28px;
         min-width: 28px;
         max-width: 28px;
         padding: 0;
         font-size: 16px;
         font-weight: 700;
-      }
-
-      #${CONFIG.floatingAnalyzeButtonId} {
-        left: 48px;
-        min-width: 58px;
-        padding: 0 7px;
-      }
-
-      #${CONFIG.floatingPhaseAnalyzeButtonId} {
-        left: 114px;
-        min-width: 58px;
-        padding: 0 7px;
       }
 
       #${CONFIG.floatingButtonId}:hover,
