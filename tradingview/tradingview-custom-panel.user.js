@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.21
-// @description  Show local signal/phase markdown or company summary in a floating TradingView panel. v0.7.21 adds display mode switching and prompt copy buttons.
+// @version      0.7.22
+// @description  Show local signal/phase markdown or company summary in a floating TradingView panel. v0.7.22 moves closed-state buttons left and uses copy-like prompt icons.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -73,7 +73,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.21",
+    panelTitle: "TV Custom Panel v0.7.22",
     titlePollIntervalMs: 1000,
   };
 
@@ -443,7 +443,7 @@
       }
 
       #${CONFIG.floatingButtonId} {
-        right: 12px;
+        left: 12px;
         width: 28px;
         min-width: 28px;
         max-width: 28px;
@@ -452,14 +452,14 @@
         font-weight: 700;
       }
 
-      #${CONFIG.floatingPhaseAnalyzeButtonId} {
-        right: 48px;
+      #${CONFIG.floatingAnalyzeButtonId} {
+        left: 48px;
         min-width: 58px;
         padding: 0 7px;
       }
 
-      #${CONFIG.floatingAnalyzeButtonId} {
-        right: 114px;
+      #${CONFIG.floatingPhaseAnalyzeButtonId} {
+        left: 114px;
         min-width: 58px;
         padding: 0 7px;
       }
@@ -791,7 +791,7 @@
     analyzeButton.id = CONFIG.analyzeButtonId;
     analyzeButton.type = "button";
     analyzeButton.title = "決算兆候分析プロンプトをコピー";
-    analyzeButton.textContent = "兆候□";
+    analyzeButton.textContent = "兆候⧉";
     analyzeButton.addEventListener("click", function () {
       copyEarningsAnalysisPrompt(analyzeButton);
     });
@@ -800,7 +800,7 @@
     phaseAnalyzeButton.id = CONFIG.phaseAnalyzeButtonId;
     phaseAnalyzeButton.type = "button";
     phaseAnalyzeButton.title = "価格局面ドライバー分析プロンプトをコピー";
-    phaseAnalyzeButton.textContent = "局面□";
+    phaseAnalyzeButton.textContent = "局面⧉";
     phaseAnalyzeButton.addEventListener("click", function () {
       copyPhaseAnalysisPrompt(phaseAnalyzeButton);
     });
@@ -995,7 +995,7 @@
     button.id = CONFIG.floatingAnalyzeButtonId;
     button.type = "button";
     button.title = "決算兆候分析プロンプトをコピー";
-    button.textContent = "兆候□";
+    button.textContent = "兆候⧉";
 
     button.addEventListener("click", function () {
       copyEarningsAnalysisPrompt(button);
@@ -1011,7 +1011,7 @@
     button.id = CONFIG.floatingPhaseAnalyzeButtonId;
     button.type = "button";
     button.title = "価格局面ドライバー分析プロンプトをコピー";
-    button.textContent = "局面□";
+    button.textContent = "局面⧉";
 
     button.addEventListener("click", function () {
       copyPhaseAnalysisPrompt(button);
@@ -2463,7 +2463,7 @@
     button.disabled = true;
 
     window.setTimeout(function () {
-      button.textContent = originalText || "□";
+      button.textContent = originalText || "⧉";
       button.disabled = false;
     }, 1500);
   }
