@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TDnet Universe Highlighter
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.1.21
-// @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする
+// @version      0.1.22
+// @description  TDnetの適時開示一覧をuniverse_public.jsonに基づいて色分けする。v0.1.22: 集計パネルを一覧画面だけに表示
 // @match        https://www.release.tdnet.info/inbs/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_setClipboard
@@ -18,7 +18,7 @@
   // 設定
   // ============================================================
 
-  const SCRIPT_VERSION = "0.1.21";
+  const SCRIPT_VERSION = "0.1.22";
 
   const UNIVERSE_URL =
     "https://raw.githubusercontent.com/hitoshi-a/public_repo/main/tdnet/universe_public.json";
@@ -402,11 +402,89 @@
     }
   }
 
+  function isPdfLikeUrl(value) {
+    return /\.pdf(?:$|[?#])/i.test(String(value || ""));
+  }
+
+  function getCurrentPathFilename() {
+    const path = String(window.location && window.location.pathname ? window.location.pathname : "");
+    const parts = path.split("/").filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : "";
+  }
+
+  function hasPdfViewerDomSignal() {
+    try {
+      const contentType = String(document.contentType || "").toLowerCase();
+      if (contentType.includes("pdf")) return true;
+
+      return Boolean(
+        document.querySelector(
+          [
+            'embed[type*="pdf" i]',
+            'object[type*="pdf" i]',
+            'embed[src*=".pdf" i]',
+            'object[data*=".pdf" i]',
+            'iframe[src*=".pdf" i]'
+          ].join(",")
+        )
+      );
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  function isLikelyDocumentViewerPage() {
+    const href = String(window.location && window.location.href ? window.location.href : "");
+    const pathname = String(window.location && window.location.pathname ? window.location.pathname : "");
+
+    if (isPdfLikeUrl(href) || isPdfLikeUrl(pathname)) {
+      return true;
+    }
+
+    return hasPdfViewerDomSignal();
+  }
+
+  function isLikelyDisclosureListUrl() {
+    const pathname = String(window.location && window.location.pathname ? window.location.pathname : "");
+    const filename = getCurrentPathFilename();
+
+    if (/^I_(?:main|list|search|bunkatsu|kouhyou|disclosure).*\.html$/i.test(filename)) {
+      return true;
+    }
+
+    return /\/inbs\/?$/i.test(pathname);
+  }
+
+  function hasDisclosureListDomSignal() {
+    const text = document.body ? document.body.textContent || "" : "";
+
+    if (/\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日\s*に開示された情報/.test(text)) {
+      return true;
+    }
+
+    const rows = findCandidateRows();
+    if (rows.some((row) => extractCodeFromRow(row))) {
+      return true;
+    }
+
+    return Array.from(document.querySelectorAll("frame, iframe")).some((frame) => {
+      const src = String(frame.getAttribute("src") || "");
+      if (!src) return false;
+      if (isPdfLikeUrl(src)) return false;
+      return /(^|\/)I_(?:main|list|search|bunkatsu|kouhyou|disclosure).*\.html(?:$|[?#])/i.test(src);
+    });
+  }
+
   function shouldShowUniverseSummary() {
     // TDnetは複数frame構成で、開示がない日には一覧frameにも実データ行がないため、
-    // 「開示行の有無」で判定するとSummaryが二重表示される。
     // Summaryは画面全体に1つあればよいので、top windowでのみ表示する。
-    return !isInFrame();
+    if (isInFrame()) return false;
+
+    // PDF・資料ビューア画面では、固定パネルが資料閲覧の邪魔になるため表示しない。
+    if (isLikelyDocumentViewerPage()) return false;
+
+    // URLまたはDOMから、TDnet開示一覧画面らしい場合だけ表示する。
+    return isLikelyDisclosureListUrl() || hasDisclosureListDomSignal();
   }
 
   function removeUniverseSummaryPanels() {
@@ -852,9 +930,15 @@ SKILL.md本文はUTF-8として扱ってください。
   // ============================================================
 
   async function main() {
-    injectStyle();
-
     console.log(`[TDnet Highlighter] script version ${SCRIPT_VERSION} loaded`);
+
+    if (isLikelyDocumentViewerPage()) {
+      console.log("[TDnet Highlighter] document/PDF viewer page detected. skip highlighter UI.");
+      removeUniverseSummaryPanels();
+      return;
+    }
+
+    injectStyle();
 
     try {
       const universe = await fetchJson(UNIVERSE_URL);
