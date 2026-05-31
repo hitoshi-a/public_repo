@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.24
-// @description  Show local signal/phase markdown or company summary in a floating TradingView panel. v0.7.24 updates Codex workspace output paths in analyze prompts.
+// @version      0.7.25
+// @description  Show local signal/phase markdown or company summary in a floating TradingView panel. v0.7.25 skips reading existing output md in analyze prompts.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -2370,6 +2370,14 @@
       "出力は、このCodex workspace内の以下の相対パスに保存してください。",
       `investment-analysis/earnings-signal-analysis/md/${filename}`,
       "",
+      "## 既存出力ファイルの扱い",
+      "",
+      "出力先mdファイルが既に存在する場合でも、既存ファイルの内容確認は不要です。",
+      "既存mdは過去の生成物であり、今回の分析資料として扱わないでください。",
+      "必要であれば、既存ファイルを確認せずに今回の分析結果で全文上書きしてください。",
+      "",
+      "前回決算との比較は、既存mdではなく、会社公式の前回決算資料・説明資料・transcript等を使ってください。",
+      "",
       "SKILL.md本文はUTF-8として扱ってください。",
       "もしmdファイルの日本語が文字化けしているように見える場合は、分析を続行せず、どのファイル・どの読み取りコマンドで文字化けしたかだけ報告してください。",
       "",
@@ -2411,6 +2419,14 @@
       "",
       "出力は、このCodex workspace内の以下の相対パスに保存してください。",
       `investment-analysis/price-phase-driver-analysis/md/${filename}`,
+      "",
+      "## 既存出力ファイルの扱い",
+      "",
+      "出力先mdファイルが既に存在する場合でも、既存ファイルの内容確認は不要です。",
+      "既存mdは過去の生成物であり、今回の分析資料として扱わないでください。",
+      "必要であれば、既存ファイルを確認せずに今回の分析結果で全文上書きしてください。",
+      "",
+      "過去局面との比較は、既存mdではなく、価格データ・公式開示・市場データ等を使ってください。",
       "",
       "SKILL.md本文はUTF-8として扱ってください。",
       "もしmdファイルの日本語が文字化けしているように見える場合は、分析を続行せず、どのファイル・どの読み取りコマンドで文字化けしたかだけ報告してください。",
