@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.20
-// @description  Show local earnings markdown or fallback company summary in a floating TradingView panel. v0.7.20 simplifies Japanese company display names.
+// @version      0.7.21
+// @description  Show local signal/phase markdown or company summary in a floating TradingView panel. v0.7.21 adds display mode switching and prompt copy buttons.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -19,20 +19,27 @@
   "use strict";
 
   const CONFIG = {
-    markdownBaseUrl: "http://127.0.0.1:8765/earnings-signal-analysis/md",
+    markdownBaseUrls: {
+      signal: "http://127.0.0.1:8765/earnings-signal-analysis/md",
+      phase: "http://127.0.0.1:8765/price-phase-driver-analysis/md",
+    },
     companySummaryUrl: "http://127.0.0.1:8765/company-summary/company_summary.json",
 
     panelId: "tv-md-panel",
     headerId: "tv-md-panel-header",
     bodyId: "tv-md-panel-body",
     refreshButtonId: "tv-md-refresh",
+    displayModeButtonId: "tv-md-display-mode",
+    displayModeMenuId: "tv-md-display-mode-menu",
     settingsButtonId: "tv-md-settings",
     renderModeButtonId: "tv-md-render-mode",
     tocButtonId: "tv-md-toc-button",
     analyzeButtonId: "tv-md-analyze-button",
+    phaseAnalyzeButtonId: "tv-md-phase-analyze-button",
     closeButtonId: "tv-md-close",
     floatingButtonId: "tv-md-floating-button",
     floatingAnalyzeButtonId: "tv-md-floating-analyze-button",
+    floatingPhaseAnalyzeButtonId: "tv-md-floating-phase-analyze-button",
     titleId: "tv-md-title",
     settingsMenuId: "tv-md-settings-menu",
     tocMenuId: "tv-md-toc-menu",
@@ -50,9 +57,11 @@
     userHiddenStorageKey: "tvCustomPanelUserHidden",
     panelRectStorageKey: "tvCustomPanelRect",
     renderModeStorageKey: "tvCustomPanelRenderMode",
+    displayModeStorageKey: "tvCustomPanelDisplayMode",
     panelOpacityStorageKey: "tvCustomPanelOpacity",
 
     defaultRenderMode: "markdown",
+    defaultDisplayMode: "signal",
     defaultPanelOpacity: 0.97,
     minPanelOpacity: 0.55,
     maxPanelOpacity: 1.0,
@@ -64,7 +73,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.20",
+    panelTitle: "TV Custom Panel v0.7.21",
     titlePollIntervalMs: 1000,
   };
 
@@ -76,6 +85,7 @@
   let resizeInitialized = false;
   let currentMarkdownText = "";
   let currentRenderMode = CONFIG.defaultRenderMode;
+  let currentDisplayMode = CONFIG.defaultDisplayMode;
   let currentPanelOpacity = CONFIG.defaultPanelOpacity;
   let currentHeadings = [];
   let companySummaryCache = null;
@@ -88,13 +98,18 @@
     }
 
     injectStyle();
+
+    currentDisplayMode = loadDisplayMode();
+
     createPanel();
-    createFloatingButton();
     createFloatingAnalyzeButton();
+    createFloatingPhaseAnalyzeButton();
+    createFloatingButton();
 
     currentRenderMode = loadRenderMode();
     currentPanelOpacity = loadPanelOpacity();
     syncRenderModeButton();
+    syncDisplayModeButton();
     applyPanelOpacity(currentPanelOpacity);
 
     applyPanelRect(loadPanelRect());
@@ -156,10 +171,12 @@
       }
 
       #${CONFIG.refreshButtonId},
+      #${CONFIG.displayModeButtonId},
       #${CONFIG.settingsButtonId},
       #${CONFIG.renderModeButtonId},
       #${CONFIG.tocButtonId},
       #${CONFIG.analyzeButtonId},
+      #${CONFIG.phaseAnalyzeButtonId},
       #${CONFIG.closeButtonId} {
         height: 24px;
         border: 1px solid #666;
@@ -177,11 +194,25 @@
         font-size: 14px;
       }
 
-      #${CONFIG.closeButtonId} {
-        min-width: 58px;
+      #${CONFIG.displayModeButtonId} {
+        min-width: 96px;
+        max-width: 132px;
         padding: 0 8px;
         font-size: 12px;
         font-weight: 600;
+        text-align: left;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+      }
+
+      #${CONFIG.closeButtonId} {
+        width: 28px;
+        min-width: 28px;
+        max-width: 28px;
+        padding: 0;
+        font-size: 16px;
+        font-weight: 700;
       }
 
       #${CONFIG.renderModeButtonId},
@@ -191,17 +222,20 @@
         font-weight: 600;
       }
 
-      #${CONFIG.analyzeButtonId} {
-        min-width: 58px;
-        padding: 0 8px;
+      #${CONFIG.analyzeButtonId},
+      #${CONFIG.phaseAnalyzeButtonId} {
+        min-width: 54px;
+        padding: 0 7px;
         font-weight: 600;
       }
 
       #${CONFIG.refreshButtonId}:hover,
+      #${CONFIG.displayModeButtonId}:hover,
       #${CONFIG.settingsButtonId}:hover,
       #${CONFIG.renderModeButtonId}:hover,
       #${CONFIG.tocButtonId}:hover,
       #${CONFIG.analyzeButtonId}:hover,
+      #${CONFIG.phaseAnalyzeButtonId}:hover,
       #${CONFIG.closeButtonId}:hover {
         background: #3a3a42;
       }
@@ -211,7 +245,6 @@
         white-space: nowrap;
         text-overflow: ellipsis;
         flex: 1;
-        font-weight: 600;
         cursor: move;
         padding: 3px 4px;
         border-radius: 3px;
@@ -392,7 +425,8 @@
       }
 
       #${CONFIG.floatingButtonId},
-      #${CONFIG.floatingAnalyzeButtonId} {
+      #${CONFIG.floatingAnalyzeButtonId},
+      #${CONFIG.floatingPhaseAnalyzeButtonId} {
         position: fixed;
         top: 58px;
         z-index: 999999;
@@ -409,19 +443,30 @@
       }
 
       #${CONFIG.floatingButtonId} {
-        left: 12px;
+        right: 12px;
+        width: 28px;
+        min-width: 28px;
+        max-width: 28px;
+        padding: 0;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      #${CONFIG.floatingPhaseAnalyzeButtonId} {
+        right: 48px;
         min-width: 58px;
-        padding: 0 8px;
+        padding: 0 7px;
       }
 
       #${CONFIG.floatingAnalyzeButtonId} {
-        left: 78px;
-        min-width: 74px;
-        padding: 0 8px;
+        right: 114px;
+        min-width: 58px;
+        padding: 0 7px;
       }
 
       #${CONFIG.floatingButtonId}:hover,
-      #${CONFIG.floatingAnalyzeButtonId}:hover {
+      #${CONFIG.floatingAnalyzeButtonId}:hover,
+      #${CONFIG.floatingPhaseAnalyzeButtonId}:hover {
         background: rgba(58, 58, 66, 0.98);
       }
 
@@ -500,6 +545,7 @@
         background: rgba(255, 255, 255, 0.14);
       }
 
+      #${CONFIG.displayModeMenuId},
       #${CONFIG.settingsMenuId},
       #${CONFIG.tocMenuId} {
         position: absolute;
@@ -513,9 +559,16 @@
         display: none;
       }
 
+      #${CONFIG.displayModeMenuId}.is-open,
       #${CONFIG.settingsMenuId}.is-open,
       #${CONFIG.tocMenuId}.is-open {
         display: block;
+      }
+
+      #${CONFIG.displayModeMenuId} {
+        left: 10px;
+        min-width: 128px;
+        padding: 6px;
       }
 
       #${CONFIG.settingsMenuId} {
@@ -608,6 +661,31 @@
         background: #3a3a42;
       }
 
+      .tv-md-mode-menu-item {
+        display: block;
+        width: 100%;
+        height: 28px;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: #ddd;
+        cursor: pointer;
+        font-size: 12px;
+        text-align: left;
+        padding: 0 8px;
+        box-sizing: border-box;
+        white-space: nowrap;
+      }
+
+      .tv-md-mode-menu-item:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .tv-md-mode-menu-item.is-active {
+        background: #4a5568;
+        color: #fff;
+      }
+
       .tv-md-toc-title {
         font-size: 12px;
         font-weight: 700;
@@ -662,6 +740,17 @@
     const header = document.createElement("div");
     header.id = CONFIG.headerId;
 
+    const displayModeButton = document.createElement("button");
+    displayModeButton.id = CONFIG.displayModeButtonId;
+    displayModeButton.type = "button";
+    displayModeButton.title = "表示モードを切り替え";
+    displayModeButton.addEventListener("click", function (event) {
+      closeSettingsMenu();
+      closeTocMenu();
+      toggleDisplayModeMenu();
+      event.stopPropagation();
+    });
+
     const refreshButton = document.createElement("button");
     refreshButton.id = CONFIG.refreshButtonId;
     refreshButton.type = "button";
@@ -683,6 +772,7 @@
     settingsButton.title = "Panel settings";
     settingsButton.textContent = "⚙";
     settingsButton.addEventListener("click", function (event) {
+      closeDisplayModeMenu();
       closeTocMenu();
       toggleSettingsMenu();
       event.stopPropagation();
@@ -697,36 +787,34 @@
       toggleRenderMode();
     });
 
-    const tocButton = document.createElement("button");
-    tocButton.id = CONFIG.tocButtonId;
-    tocButton.type = "button";
-    tocButton.title = "Show heading navigation";
-    tocButton.textContent = "TOC";
-    tocButton.addEventListener("click", function (event) {
-      closeSettingsMenu();
-      toggleTocMenu();
-      event.stopPropagation();
-    });
-
     const analyzeButton = document.createElement("button");
     analyzeButton.id = CONFIG.analyzeButtonId;
     analyzeButton.type = "button";
-    analyzeButton.title = "Copy earnings analysis prompt for current ticker";
-    analyzeButton.textContent = "Analyze";
+    analyzeButton.title = "決算兆候分析プロンプトをコピー";
+    analyzeButton.textContent = "兆候□";
     analyzeButton.addEventListener("click", function () {
       copyEarningsAnalysisPrompt(analyzeButton);
     });
 
+    const phaseAnalyzeButton = document.createElement("button");
+    phaseAnalyzeButton.id = CONFIG.phaseAnalyzeButtonId;
+    phaseAnalyzeButton.type = "button";
+    phaseAnalyzeButton.title = "価格局面ドライバー分析プロンプトをコピー";
+    phaseAnalyzeButton.textContent = "局面□";
+    phaseAnalyzeButton.addEventListener("click", function () {
+      copyPhaseAnalysisPrompt(phaseAnalyzeButton);
+    });
+
     const title = document.createElement("span");
     title.id = CONFIG.titleId;
-    title.textContent = CONFIG.panelTitle;
+    title.textContent = "";
     title.title = "Drag here to move panel";
 
     const closeButton = document.createElement("button");
     closeButton.id = CONFIG.closeButtonId;
     closeButton.type = "button";
-    closeButton.title = "Toggle panel";
-    closeButton.textContent = "Panel";
+    closeButton.title = "Close panel";
+    closeButton.textContent = "-";
     closeButton.addEventListener("click", function () {
       setUserHidden(true);
       hidePanel();
@@ -755,6 +843,9 @@
 
     const cornerResizer = document.createElement("div");
     cornerResizer.id = CONFIG.cornerResizerId;
+
+    const displayModeMenu = document.createElement("div");
+    displayModeMenu.id = CONFIG.displayModeMenuId;
 
     const settingsMenu = document.createElement("div");
     settingsMenu.id = CONFIG.settingsMenuId;
@@ -822,10 +913,12 @@
     const tocMenu = document.createElement("div");
     tocMenu.id = CONFIG.tocMenuId;
 
+    header.appendChild(displayModeButton);
     header.appendChild(title);
-    header.appendChild(closeButton);
     header.appendChild(analyzeButton);
+    header.appendChild(phaseAnalyzeButton);
     header.appendChild(settingsButton);
+    header.appendChild(closeButton);
 
     panel.appendChild(header);
     panel.appendChild(body);
@@ -835,17 +928,30 @@
     panel.appendChild(rightResizer);
     panel.appendChild(bottomResizer);
     panel.appendChild(cornerResizer);
+    panel.appendChild(displayModeMenu);
     panel.appendChild(settingsMenu);
     panel.appendChild(tocMenu);
 
     document.body.appendChild(panel);
 
     syncRenderModeButton();
+    syncDisplayModeButton();
 
     window.addEventListener("click", function (event) {
+      const displayModeMenuElement = document.getElementById(CONFIG.displayModeMenuId);
+      const displayModeButtonElement = document.getElementById(CONFIG.displayModeButtonId);
       const settingsMenuElement = document.getElementById(CONFIG.settingsMenuId);
       const settingsButtonElement = document.getElementById(CONFIG.settingsButtonId);
       const tocMenuElement = document.getElementById(CONFIG.tocMenuId);
+
+      if (
+        displayModeMenuElement &&
+        displayModeButtonElement &&
+        !displayModeMenuElement.contains(event.target) &&
+        !displayModeButtonElement.contains(event.target)
+      ) {
+        closeDisplayModeMenu();
+      }
 
       if (
         settingsMenuElement &&
@@ -868,8 +974,8 @@
     const button = document.createElement("button");
     button.id = CONFIG.floatingButtonId;
     button.type = "button";
-    button.title = "Show markdown panel";
-    button.textContent = "Panel";
+    button.title = "Open panel";
+    button.textContent = "+";
 
     button.addEventListener("click", function () {
       setUserHidden(false);
@@ -888,11 +994,27 @@
     const button = document.createElement("button");
     button.id = CONFIG.floatingAnalyzeButtonId;
     button.type = "button";
-    button.title = "Copy earnings analysis prompt for current ticker";
-    button.textContent = "Analyze";
+    button.title = "決算兆候分析プロンプトをコピー";
+    button.textContent = "兆候□";
 
     button.addEventListener("click", function () {
       copyEarningsAnalysisPrompt(button);
+    });
+
+    document.body.appendChild(button);
+  }
+
+  function createFloatingPhaseAnalyzeButton() {
+    if (document.getElementById(CONFIG.floatingPhaseAnalyzeButtonId)) return;
+
+    const button = document.createElement("button");
+    button.id = CONFIG.floatingPhaseAnalyzeButtonId;
+    button.type = "button";
+    button.title = "価格局面ドライバー分析プロンプトをコピー";
+    button.textContent = "局面□";
+
+    button.addEventListener("click", function () {
+      copyPhaseAnalysisPrompt(button);
     });
 
     document.body.appendChild(button);
@@ -929,15 +1051,23 @@
       return;
     }
 
-    if (!forceReload && target.ticker === lastTicker) {
+    if (!forceReload && target.cacheKey === lastTicker) {
       return;
     }
 
-    lastTicker = target.ticker;
+    lastTicker = target.cacheKey;
     currentTarget = target;
 
     if (userHidden && !showErrorPanel) {
       hidePanel();
+      return;
+    }
+
+    if (target.contentType === "summary") {
+      showCompanySummaryContent(target, {
+        showErrorPanel: showErrorPanel,
+        isFallback: false,
+      });
       return;
     }
 
@@ -950,13 +1080,18 @@
     const ticker = extractTickerFromTitle(document.title);
     if (!ticker) return null;
 
+    const mode = normalizeDisplayMode(currentDisplayMode);
     const filename = tickerToMdFilename(ticker);
-    const url = buildMarkdownUrl(filename);
+    const contentType = mode === "summary" ? "summary" : "markdown";
+    const url = contentType === "markdown" ? buildMarkdownUrl(filename, mode) : null;
 
     return {
       ticker: ticker,
       filename: filename,
+      mode: mode,
+      contentType: contentType,
       url: url,
+      cacheKey: `${ticker}|${mode}`,
     };
   }
 
@@ -980,8 +1115,14 @@
     return `${t.replace(/[\\/:*?"<>|]/g, "_")}.md`;
   }
 
-  function buildMarkdownUrl(filename) {
-    const base = CONFIG.markdownBaseUrl.replace(/\/+$/, "");
+  function getMarkdownBaseUrl(mode) {
+    const normalized = normalizeDisplayMode(mode);
+    const base = CONFIG.markdownBaseUrls[normalized] || CONFIG.markdownBaseUrls.signal;
+    return String(base || "").replace(/\/+$/, "");
+  }
+
+  function buildMarkdownUrl(filename, mode) {
+    const base = getMarkdownBaseUrl(mode);
     return `${base}/${encodeURIComponent(filename)}`;
   }
 
@@ -996,7 +1137,7 @@
 
     if (showErrorPanel) {
       showPanel();
-      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / loading`;
+      title.textContent = "";
       setBodyText(
         [
           "Markdownを取得しています。",
@@ -1260,19 +1401,29 @@
   }
 
   function showCompanySummaryFallback(target, options) {
+    showCompanySummaryContent(target, {
+      showErrorPanel: Boolean(options && options.showErrorPanel),
+      isFallback: true,
+    });
+  }
+
+  function showCompanySummaryContent(target, options) {
     const showErrorPanel = Boolean(options && options.showErrorPanel);
+    const isFallback = Boolean(options && options.isFallback);
     const title = document.getElementById(CONFIG.titleId);
 
     showPanel();
 
     if (title) {
-      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / company summary loading`;
+      title.textContent = "";
     }
 
     if (showErrorPanel) {
       setBodyText(
         [
-          "mdファイルが見つからないため、簡易会社概要を取得しています。",
+          isFallback
+            ? "mdファイルが見つからないため、簡易会社概要を取得しています。"
+            : "簡易会社概要を取得しています。",
           "",
           "Ticker:",
           target.ticker,
@@ -1302,7 +1453,9 @@
 
         showError(
           [
-            "mdファイルが見つからず、company_summary.json の取得にも失敗しました。",
+            isFallback
+              ? "mdファイルが見つからず、company_summary.json の取得にも失敗しました。"
+              : "company_summary.json の取得に失敗しました。",
             "",
             "Ticker:",
             target.ticker,
@@ -1340,7 +1493,7 @@
     const title = document.getElementById(CONFIG.titleId);
 
     if (title) {
-      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / company summary`;
+      title.textContent = "";
     }
 
     const markdown = buildCompanySummaryMarkdown(profile, target);
@@ -1352,7 +1505,7 @@
     const title = document.getElementById(CONFIG.titleId);
 
     if (title) {
-      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / no data`;
+      title.textContent = "";
     }
 
     currentMarkdownText = "";
@@ -1361,7 +1514,9 @@
 
     setBodyText(
       [
-        "mdファイルが見つからず、会社概要データにも該当tickerがありません。",
+        target.contentType === "summary"
+          ? "会社概要データに該当tickerがありません。"
+          : "mdファイルが見つからず、会社概要データにも該当tickerがありません。",
         "",
         "Ticker:",
         target.ticker,
@@ -1465,7 +1620,7 @@
     const title = document.getElementById(CONFIG.titleId);
 
     if (title) {
-      title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / earnings signal`;
+      title.textContent = "";
     }
 
     currentMarkdownText = String(markdown || "");
@@ -1548,6 +1703,108 @@
     } catch (error) {
       console.warn("[TV Custom Panel] Failed to save render mode:", error);
     }
+  }
+
+  function normalizeDisplayMode(mode) {
+    if (mode === "phase" || mode === "summary" || mode === "signal") {
+      return mode;
+    }
+    return CONFIG.defaultDisplayMode;
+  }
+
+  function getDisplayModeLabel(mode) {
+    const normalized = normalizeDisplayMode(mode);
+
+    if (normalized === "phase") return "価格局面";
+    if (normalized === "summary") return "会社概要";
+    return "決算兆候";
+  }
+
+  function loadDisplayMode() {
+    try {
+      return normalizeDisplayMode(localStorage.getItem(CONFIG.displayModeStorageKey));
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to load display mode:", error);
+      return CONFIG.defaultDisplayMode;
+    }
+  }
+
+  function saveDisplayMode(mode) {
+    try {
+      localStorage.setItem(CONFIG.displayModeStorageKey, normalizeDisplayMode(mode));
+    } catch (error) {
+      console.warn("[TV Custom Panel] Failed to save display mode:", error);
+    }
+  }
+
+  function syncDisplayModeButton() {
+    const button = document.getElementById(CONFIG.displayModeButtonId);
+    if (!button) return;
+
+    button.textContent = `${getDisplayModeLabel(currentDisplayMode)} ▼`;
+    button.title = "表示モードを切り替え";
+    renderDisplayModeMenu();
+  }
+
+  function toggleDisplayModeMenu() {
+    const menu = document.getElementById(CONFIG.displayModeMenuId);
+    if (!menu) return;
+
+    renderDisplayModeMenu();
+    menu.classList.toggle("is-open");
+  }
+
+  function closeDisplayModeMenu() {
+    const menu = document.getElementById(CONFIG.displayModeMenuId);
+    if (!menu) return;
+
+    menu.classList.remove("is-open");
+  }
+
+  function renderDisplayModeMenu() {
+    const menu = document.getElementById(CONFIG.displayModeMenuId);
+    if (!menu) return;
+
+    const modes = [
+      { key: "signal", label: "決算兆候" },
+      { key: "phase", label: "価格局面" },
+      { key: "summary", label: "会社概要" },
+    ];
+
+    menu.innerHTML = modes
+      .map(function (mode) {
+        const activeClass = normalizeDisplayMode(currentDisplayMode) === mode.key ? " is-active" : "";
+        return `<button type="button" class="tv-md-mode-menu-item${activeClass}" data-mode="${mode.key}">${escapeHtml(mode.label)}</button>`;
+      })
+      .join("");
+
+    Array.from(menu.querySelectorAll(".tv-md-mode-menu-item")).forEach(function (button) {
+      button.addEventListener("click", function (event) {
+        const mode = button.getAttribute("data-mode");
+        setDisplayMode(mode);
+        event.stopPropagation();
+      });
+    });
+  }
+
+  function setDisplayMode(mode) {
+    const normalized = normalizeDisplayMode(mode);
+
+    if (normalized === currentDisplayMode) {
+      closeDisplayModeMenu();
+      return;
+    }
+
+    currentDisplayMode = normalized;
+    saveDisplayMode(currentDisplayMode);
+    syncDisplayModeButton();
+    closeDisplayModeMenu();
+    setUserHidden(false);
+
+    loadCurrentTickerMarkdown({
+      forceReload: true,
+      showErrorPanel: true,
+    });
   }
 
   function simpleMarkdownToHtml(markdown) {
@@ -1978,7 +2235,7 @@
     const title = document.getElementById(CONFIG.titleId);
 
     if (title) {
-      title.textContent = `${CONFIG.panelTitle} / ticker error`;
+      title.textContent = "";
     }
 
     setBodyText(
@@ -2010,9 +2267,9 @@
 
     if (title) {
       if (target && target.ticker) {
-        title.textContent = `${CONFIG.panelTitle} / ${target.ticker} / error`;
+        title.textContent = "";
       } else {
-        title.textContent = `${CONFIG.panelTitle} / error`;
+        title.textContent = "";
       }
     }
 
@@ -2032,6 +2289,7 @@
     if (panel) {
       panel.style.display = "none";
     }
+    closeDisplayModeMenu();
     closeSettingsMenu();
     closeTocMenu();
     updateFloatingButtonVisibility();
@@ -2062,6 +2320,7 @@
     const panel = document.getElementById(CONFIG.panelId);
     const button = document.getElementById(CONFIG.floatingButtonId);
     const analyzeButton = document.getElementById(CONFIG.floatingAnalyzeButtonId);
+    const phaseAnalyzeButton = document.getElementById(CONFIG.floatingPhaseAnalyzeButtonId);
     const panelVisible = panel && panel.style.display !== "none";
 
     if (button) {
@@ -2070,6 +2329,10 @@
 
     if (analyzeButton) {
       analyzeButton.style.display = panelVisible ? "none" : "block";
+    }
+
+    if (phaseAnalyzeButton) {
+      phaseAnalyzeButton.style.display = panelVisible ? "none" : "block";
     }
   }
 
@@ -2098,7 +2361,7 @@
     const filename = String(target && target.filename ? target.filename : `${ticker}.md`).trim();
 
     return [
-      `# 決算分析　対象：${ticker}`,
+      `# 決算兆候分析　対象：${ticker}`,
       "",
       "Codex Skill「earnings-signal-analysis」を使用してください。",
       "SKILL.md本文を直接読んで実行してください。",
@@ -2106,6 +2369,48 @@
       "",
       "出力は、このCodex workspace内の以下の相対パスに保存してください。",
       `earnings-signal-analysis/md/${filename}`,
+      "",
+      "SKILL.md本文はUTF-8として扱ってください。",
+      "もしmdファイルの日本語が文字化けしているように見える場合は、分析を続行せず、どのファイル・どの読み取りコマンドで文字化けしたかだけ報告してください。",
+      "",
+      "文字化け対策やEncoding Guardをskill本文に追加しないでください。",
+      "今回は分析結果mdの作成のみを行い、skillファイルや設定ファイルは編集しないでください。",
+    ].join("\n");
+  }
+
+  function copyPhaseAnalysisPrompt(button) {
+    const target = buildTargetFromCurrentTitle();
+
+    if (!target || !target.ticker || !target.filename) {
+      showAnalyzeButtonFeedback(button, "No ticker");
+      return;
+    }
+
+    const prompt = buildPhaseAnalysisPrompt(target);
+
+    copyTextToClipboard(prompt)
+      .then(function () {
+        showAnalyzeButtonFeedback(button, "Copied");
+      })
+      .catch(function (error) {
+        console.warn("[TV Custom Panel] Failed to copy phase prompt:", error);
+        showAnalyzeButtonFeedback(button, "Copy NG");
+      });
+  }
+
+  function buildPhaseAnalysisPrompt(target) {
+    const ticker = String(target && target.ticker ? target.ticker : "").trim().toUpperCase();
+    const filename = String(target && target.filename ? target.filename : `${ticker}.md`).trim();
+
+    return [
+      `# 価格局面ドライバー分析　対象：${ticker}`,
+      "",
+      "Codex Skill「price-phase-driver-analysis」を使用してください。",
+      "SKILL.md本文を直接読んで実行してください。",
+      "frontmatter、summary、generated yaml、default_prompt、過去の記憶だけで実行しないでください。",
+      "",
+      "出力は、このCodex workspace内の以下の相対パスに保存してください。",
+      `price-phase-driver-analysis/md/${filename}`,
       "",
       "SKILL.md本文はUTF-8として扱ってください。",
       "もしmdファイルの日本語が文字化けしているように見える場合は、分析を続行せず、どのファイル・どの読み取りコマンドで文字化けしたかだけ報告してください。",
@@ -2158,7 +2463,7 @@
     button.disabled = true;
 
     window.setTimeout(function () {
-      button.textContent = originalText || "Analyze";
+      button.textContent = originalText || "□";
       button.disabled = false;
     }, 1500);
   }
@@ -2541,7 +2846,7 @@
   }
 
   function isStaleTarget(target) {
-    return !currentTarget || currentTarget.ticker !== target.ticker;
+    return !currentTarget || currentTarget.ticker !== target.ticker || currentTarget.mode !== target.mode;
   }
 
   function withCacheBuster(url) {
