@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TradingView Custom Panel
 // @namespace    https://github.com/hitoshi-a/public_repo
-// @version      0.7.23
-// @description  Show local signal/phase markdown or company summary in a floating TradingView panel. v0.7.23 reorders closed-state floating buttons.
+// @version      0.7.24
+// @description  Show local signal/phase markdown or company summary in a floating TradingView panel. v0.7.24 updates Codex workspace output paths in analyze prompts.
 // @match        https://tradingview.com/*
 // @match        https://www.tradingview.com/*
 // @match        https://*.tradingview.com/*
@@ -73,7 +73,7 @@
     maxPanelWidth: 1200,
     minPanelHeight: 240,
 
-    panelTitle: "TV Custom Panel v0.7.23",
+    panelTitle: "TV Custom Panel v0.7.24",
     titlePollIntervalMs: 1000,
   };
 
@@ -2368,7 +2368,7 @@
       "frontmatter、summary、generated yaml、default_prompt、過去の記憶だけで実行しないでください。",
       "",
       "出力は、このCodex workspace内の以下の相対パスに保存してください。",
-      `earnings-signal-analysis/md/${filename}`,
+      `investment-analysis/earnings-signal-analysis/md/${filename}`,
       "",
       "SKILL.md本文はUTF-8として扱ってください。",
       "もしmdファイルの日本語が文字化けしているように見える場合は、分析を続行せず、どのファイル・どの読み取りコマンドで文字化けしたかだけ報告してください。",
@@ -2410,7 +2410,7 @@
       "frontmatter、summary、generated yaml、default_prompt、過去の記憶だけで実行しないでください。",
       "",
       "出力は、このCodex workspace内の以下の相対パスに保存してください。",
-      `price-phase-driver-analysis/md/${filename}`,
+      `investment-analysis/price-phase-driver-analysis/md/${filename}`,
       "",
       "SKILL.md本文はUTF-8として扱ってください。",
       "もしmdファイルの日本語が文字化けしているように見える場合は、分析を続行せず、どのファイル・どの読み取りコマンドで文字化けしたかだけ報告してください。",
