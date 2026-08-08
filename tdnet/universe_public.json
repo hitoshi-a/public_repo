@@ -1,6 +1,6 @@
 {
   "schema_version": "0.3",
-  "generated_at": "2026-08-08T07:01:23+09:00",
+  "generated_at": "2026-08-09T04:01:24+09:00",
   "source": {
     "master_source": "JPX data_j.xls",
     "master_url": "https://www.jpx.co.jp/markets/statistics-equities/misc/tvdivq0000001vg2-att/data_j.xls",
@@ -339,10 +339,10 @@
       "yf_name": "SPDR GOLD TRUST GOLD SHARES NPV",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 61600.0,
+      "last_close": 62230.0,
       "avg_volume_20d": 8812.5,
-      "avg_value_20d": 542850000.0,
-      "avg_value_20d_label": "5.4億円",
+      "avg_value_20d": 548401875.0,
+      "avg_value_20d_label": "5.5億円",
       "market_status": "ng",
       "liquidity_status": "ok",
       "universe_status": "ng",
@@ -589,15 +589,15 @@
       "yf_sector": null,
       "yf_industry": null,
       "last_close": 17390.0,
-      "avg_volume_20d": 77.8,
-      "avg_value_20d": 1352942.0,
-      "avg_value_20d_label": "135万円",
+      "avg_volume_20d": 76.3,
+      "avg_value_20d": 1326857.0,
+      "avg_value_20d_label": "133万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（135万円）"
+        "20日平均売買代金が5,000万円未満（133万円）"
       ]
     },
     "134A": {
@@ -2968,9 +2968,9 @@
       "yf_name": "STATE ST SPDR S&P 500 ETF TR S&",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 121800.0,
+      "last_close": 121700.0,
       "avg_volume_20d": 2234.55,
-      "avg_value_20d": 272168190.0,
+      "avg_value_20d": 271944735.0,
       "avg_value_20d_label": "2.7億円",
       "market_status": "ng",
       "liquidity_status": "ok",
@@ -4428,16 +4428,16 @@
       "yf_name": "WISDOMTREE METAL SECURITIES PHY",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 8850.0,
+      "last_close": 9115.0,
       "avg_volume_20d": 4600.0,
-      "avg_value_20d": 40710000.0,
-      "avg_value_20d_label": "4071万円",
+      "avg_value_20d": 41929000.0,
+      "avg_value_20d_label": "4193万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（4071万円）"
+        "20日平均売買代金が5,000万円未満（4193万円）"
       ]
     },
     "1674": {
@@ -4450,16 +4450,16 @@
       "yf_name": "WISDOMTREE METAL SECURITIES PHY",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 24945.0,
+      "last_close": 25380.0,
       "avg_volume_20d": 438.4,
-      "avg_value_20d": 10935888.0,
-      "avg_value_20d_label": "1094万円",
+      "avg_value_20d": 11126592.0,
+      "avg_value_20d_label": "1113万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（1094万円）"
+        "20日平均売買代金が5,000万円未満（1113万円）"
       ]
     },
     "1675": {
@@ -4472,16 +4472,16 @@
       "yf_name": "WISDOMTREE METAL SECURITIES PHY",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 19880.0,
+      "last_close": 19715.0,
       "avg_volume_20d": 229.55,
-      "avg_value_20d": 4563454.0,
-      "avg_value_20d_label": "456万円",
+      "avg_value_20d": 4525578.25,
+      "avg_value_20d_label": "453万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（456万円）"
+        "20日平均売買代金が5,000万円未満（453万円）"
       ]
     },
     "1676": {
@@ -4494,16 +4494,16 @@
       "yf_name": "WISDOMTREE METAL SECURITIES PHY",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 40000.0,
+      "last_close": 41100.0,
       "avg_volume_20d": 31.7,
-      "avg_value_20d": 1268000.0,
-      "avg_value_20d_label": "127万円",
+      "avg_value_20d": 1302870.0,
+      "avg_value_20d_label": "130万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（127万円）"
+        "20日平均売買代金が5,000万円未満（130万円）"
       ]
     },
     "1677": {
@@ -4644,16 +4644,16 @@
       "yf_name": "WISDOMTREE COMMODITY SECURITIES",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 2405.0,
+      "last_close": 2490.0,
       "avg_volume_20d": 254.5,
-      "avg_value_20d": 612072.5,
-      "avg_value_20d_label": "61万円",
+      "avg_value_20d": 633705.0,
+      "avg_value_20d_label": "63万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（61万円）"
+        "20日平均売買代金が5,000万円未満（63万円）"
       ]
     },
     "1685": {
@@ -4754,16 +4754,16 @@
       "yf_name": "WISDOMTREE COMMODITY SECURITIES",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 718.0,
+      "last_close": 711.0,
       "avg_volume_20d": 70221.05,
-      "avg_value_20d": 50418713.9,
-      "avg_value_20d_label": "5042万円",
+      "avg_value_20d": 49927166.550000004,
+      "avg_value_20d_label": "4993万円",
       "market_status": "ng",
-      "liquidity_status": "caution",
+      "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が注意水準（5042万円）"
+        "20日平均売買代金が5,000万円未満（4993万円）"
       ]
     },
     "168A": {
@@ -4797,16 +4797,16 @@
       "yf_name": "WISDOMTREE COMMODITY SECURITIES",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 2120.0,
+      "last_close": 2227.5,
       "avg_volume_20d": 3563.5,
-      "avg_value_20d": 7554620.0,
-      "avg_value_20d_label": "755万円",
+      "avg_value_20d": 7937696.25,
+      "avg_value_20d_label": "794万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（755万円）"
+        "20日平均売買代金が5,000万円未満（794万円）"
       ]
     },
     "1691": {
@@ -4819,16 +4819,16 @@
       "yf_name": "WISDOMTREE COMMODITY SECURITIES",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 13005.0,
+      "last_close": 13500.0,
       "avg_volume_20d": 85.75,
-      "avg_value_20d": 1115178.75,
-      "avg_value_20d_label": "112万円",
+      "avg_value_20d": 1157625.0,
+      "avg_value_20d_label": "116万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（112万円）"
+        "20日平均売買代金が5,000万円未満（116万円）"
       ]
     },
     "1692": {
@@ -4841,16 +4841,16 @@
       "yf_name": "WISDOMTREE COMMODITY SECURITIES",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 667.5999755859375,
+      "last_close": 687.0,
       "avg_volume_20d": 3840.0,
-      "avg_value_20d": 2563583.90625,
-      "avg_value_20d_label": "256万円",
+      "avg_value_20d": 2638080.0,
+      "avg_value_20d_label": "264万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（256万円）"
+        "20日平均売買代金が5,000万円未満（264万円）"
       ]
     },
     "1693": {
@@ -4863,16 +4863,16 @@
       "yf_name": "WISDOMTREE COMMODITY SECURITIES",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 9104.0,
+      "last_close": 9164.0,
       "avg_volume_20d": 6629.0,
-      "avg_value_20d": 60350416.0,
-      "avg_value_20d_label": "6035万円",
+      "avg_value_20d": 60748156.0,
+      "avg_value_20d_label": "6075万円",
       "market_status": "ng",
       "liquidity_status": "caution",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が注意水準（6035万円）"
+        "20日平均売買代金が注意水準（6075万円）"
       ]
     },
     "1694": {
@@ -4885,9 +4885,9 @@
       "yf_name": "WISDOMTREE COMMODITY SECURITIES",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 2399.0,
+      "last_close": 2380.5,
       "avg_volume_20d": 150.5,
-      "avg_value_20d": 361049.5,
+      "avg_value_20d": 358265.25,
       "avg_value_20d_label": "36万円",
       "market_status": "ng",
       "liquidity_status": "ng",
@@ -4907,16 +4907,16 @@
       "yf_name": "WISDOMTREE COMMODITY SECURITIES",
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 3285.0,
+      "last_close": 3241.0,
       "avg_volume_20d": 13640.05,
-      "avg_value_20d": 44807564.25,
-      "avg_value_20d_label": "4481万円",
+      "avg_value_20d": 44207402.05,
+      "avg_value_20d_label": "4421万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（4481万円）"
+        "20日平均売買代金が5,000万円未満（4421万円）"
       ]
     },
     "1696": {
@@ -51795,16 +51795,16 @@
       "yf_name": null,
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 112900.0,
+      "last_close": 113500.0,
       "avg_volume_20d": 373.35,
-      "avg_value_20d": 42151215.0,
-      "avg_value_20d_label": "4215万円",
+      "avg_value_20d": 42375225.0,
+      "avg_value_20d_label": "4238万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（4215万円）"
+        "20日平均売買代金が5,000万円未満（4238万円）"
       ]
     },
     "5884": {
@@ -54769,15 +54769,15 @@
       "yf_sector": null,
       "yf_industry": null,
       "last_close": 1068.0,
-      "avg_volume_20d": 13293.0,
-      "avg_value_20d": 14196924.0,
-      "avg_value_20d_label": "1420万円",
+      "avg_volume_20d": 8716.666666666666,
+      "avg_value_20d": 9309400.0,
+      "avg_value_20d_label": "931万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（1420万円）"
+        "20日平均売買代金が5,000万円未満（931万円）"
       ]
     },
     "6101": {
@@ -54847,16 +54847,16 @@
       "yf_name": null,
       "yf_sector": null,
       "yf_industry": null,
-      "last_close": 1016.0,
-      "avg_volume_20d": 35879.5,
-      "avg_value_20d": 36453572.0,
-      "avg_value_20d_label": "3645万円",
+      "last_close": 1069.0,
+      "avg_volume_20d": 69095.16666666667,
+      "avg_value_20d": 73862733.16666667,
+      "avg_value_20d_label": "7386万円",
       "market_status": "ng",
-      "liquidity_status": "ng",
+      "liquidity_status": "caution",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（3645万円）"
+        "20日平均売買代金が注意水準（7386万円）"
       ]
     },
     "6113": {
@@ -54908,15 +54908,15 @@
       "yf_sector": null,
       "yf_industry": null,
       "last_close": 1013.0,
-      "avg_volume_20d": 1260.0,
-      "avg_value_20d": 1276380.0,
-      "avg_value_20d_label": "128万円",
+      "avg_volume_20d": 966.6666666666666,
+      "avg_value_20d": 979233.3333333333,
+      "avg_value_20d_label": "98万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（128万円）"
+        "20日平均売買代金が5,000万円未満（98万円）"
       ]
     },
     "6125": {
@@ -54949,15 +54949,15 @@
       "yf_sector": null,
       "yf_industry": null,
       "last_close": 10410.0,
-      "avg_volume_20d": 10.0,
-      "avg_value_20d": 104100.0,
-      "avg_value_20d_label": "10万円",
+      "avg_volume_20d": 23.333333333333332,
+      "avg_value_20d": 242900.0,
+      "avg_value_20d_label": "24万円",
       "market_status": "ng",
       "liquidity_status": "ng",
       "universe_status": "ng",
       "reasons": [
         "市場・商品区分が対象外候補（ETF・ETN）",
-        "20日平均売買代金が5,000万円未満（10万円）"
+        "20日平均売買代金が5,000万円未満（24万円）"
       ]
     },
     "6134": {
